@@ -30,6 +30,8 @@
   --avail-soft: #D5EDE3;
   --drop: #A4483F;
   --drop-soft: #F4DEDB;
+  --route: #6A4C9C;          /* civics-style violet: route nodes */
+  --route-soft: #ECE5F5;
   --shadow: rgba(21, 33, 46, .12);
   --scrim: rgba(21, 33, 46, .38);
   --font-display: "Marcellus SC", "Iowan Old Style", Georgia, serif;
@@ -42,7 +44,7 @@
     --ink: #E4EAF1; --muted: #93A3B4; --line: #2C3B4D; --line-strong: #50647B;
     --accent: #DAAA48; --accent-soft: #3A2F16; --done-bg: #221E14;
     --active: #6FA5FF; --active-soft: #1B2E4C; --avail: #48C795; --avail-soft: #14352A;
-    --drop: #E07D72; --drop-soft: #3B201D; --shadow: rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
+    --drop: #E07D72; --drop-soft: #3B201D; --route: #B9A0EC; --route-soft: #2B2342; --shadow: rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
     color-scheme: dark;
   }
 }
@@ -51,7 +53,7 @@
   --ink: #E4EAF1; --muted: #93A3B4; --line: #2C3B4D; --line-strong: #50647B;
   --accent: #DAAA48; --accent-soft: #3A2F16; --done-bg: #221E14;
   --active: #6FA5FF; --active-soft: #1B2E4C; --avail: #48C795; --avail-soft: #14352A;
-  --drop: #E07D72; --drop-soft: #3B201D; --shadow: rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
+  --drop: #E07D72; --drop-soft: #3B201D; --route: #B9A0EC; --route-soft: #2B2342; --shadow: rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
   color-scheme: dark;
 }
 
@@ -135,6 +137,7 @@ button { cursor: pointer; }
 .e-path { stroke: var(--active); stroke-width: 3; }
 .e-next { stroke: var(--avail); stroke-width: 2.5; }
 .e-temp { stroke: var(--active); stroke-width: 2; stroke-dasharray: 6 4; }
+.e-explore { stroke: var(--active); opacity: .55; }
 
 .node {
   position: absolute; width: 236px; height: 84px; display: flex; align-items: center; gap: 10px;
@@ -152,7 +155,7 @@ button { cursor: pointer; }
   font-weight: 600; font-size: 13.5px; line-height: 1.25; overflow: hidden;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
-.nmeta { display: flex; align-items: center; gap: 7px; margin-top: 6px; font: 500 11px/1 var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.nmeta { display: flex; align-items: center; gap: 7px; margin-top: 6px; overflow: hidden; white-space: nowrap; font: 500 11px/1 var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .kind { font: 600 9.5px/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; padding: 3px 5px; border-radius: 4px; background: var(--surface-2); color: var(--muted); }
 .port {
   position: absolute; right: -9px; top: 50%; width: 16px; height: 16px; margin-top: -8px; border-radius: 50%;
@@ -172,6 +175,9 @@ button { cursor: pointer; }
 .node.s-dropped { opacity: .58; }
 .node.s-dropped .ntitle { text-decoration: line-through; }
 .node.s-superseded, .node.s-blocked { opacity: .64; border-style: dashed; }
+/* Route cards are signpost-shaped and carry a diamond, the flowchart sign for a decision. */
+.node.route { border-radius: 8px 42px 42px 8px; padding-right: 26px; }
+.kind.k-route { background: var(--route-soft); color: var(--route); }
 
 .m-done { fill: var(--accent); }
 .m-check { stroke: var(--surface); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
@@ -188,6 +194,10 @@ button { cursor: pointer; }
 .m-dash { stroke: var(--line-strong); stroke-width: 2.2; stroke-linecap: round; }
 .m-ring-cut { stroke: var(--drop); stroke-width: 2; stroke-dasharray: 3 3.2; }
 .m-cut { stroke: var(--drop); stroke-width: 2.2; stroke-linecap: round; }
+.r-active { fill: var(--active-soft); stroke: var(--active); stroke-width: 2.2; stroke-linejoin: round; }
+.r-tally { fill: var(--active); font: 600 9px var(--font-mono); text-anchor: middle; }
+.r-avail { stroke: var(--avail); stroke-width: 2.2; stroke-linejoin: round; }
+.m-lockbg, .m-ring-drop, .m-ring-dash, .m-ring-cut { stroke-linejoin: round; }
 
 .orpill {
   position: absolute; transform: translate(-50%, -50%); padding: 2px 6px; border-radius: 999px;
@@ -232,6 +242,8 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
 .dot.s-dropped, .fr-bar .seg-dropped { background: var(--drop); }
 .dot.s-superseded, .fr-bar .seg-superseded { background: transparent; border: 1.5px dashed var(--line-strong); }
 .dot.s-blocked, .fr-bar .seg-blocked { background: transparent; border: 1.5px dashed var(--drop); }
+.dot.route { border-radius: 1.5px; transform: rotate(45deg) scale(.8); }
+.dot.shape { background: var(--muted); border: 0; }
 
 /* ---------- inspector */
 .inspector {
@@ -239,7 +251,7 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
   overflow: auto; display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; align-content: start; gap: 14px; padding: 16px;
   background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 34px var(--shadow);
 }
-.i-top { display: flex; align-items: center; gap: 8px; }
+.i-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .i-tier { font: 12px/1 var(--font-display); letter-spacing: .14em; color: var(--muted); }
 .icon-btn { margin-left: auto; width: 30px; height: 30px; border-radius: 6px; border: 1px solid transparent; background: none; font-size: 20px; line-height: 1; color: var(--muted); }
 .icon-btn:hover { border-color: var(--line); color: var(--ink); }
@@ -285,10 +297,22 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
 .pathbox p { margin: 0; font-size: 13px; }
 .pathbox .hint, .hint { font-size: 12px; color: var(--muted); }
 .warn { color: var(--drop); }
-.i-acts { display: flex; flex-wrap: wrap; gap: 6px; }
 .i-acts2 { display: flex; align-items: center; gap: 6px; }
 .grow { flex: 1; }
 .i-meta { margin: 0; font: 11px/1.4 var(--font-mono); color: var(--muted); }
+.type-seg button[data-type="route"].on { background: var(--route); }
+.routebox { display: grid; gap: 4px; padding: 10px 12px; border-radius: 8px; background: var(--route-soft); }
+.routebox p { margin: 0; font-size: 13px; }
+.cmp-wrap { overflow-x: auto; }
+.cmp { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.cmp th { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); font: 600 10px/1.3 var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.cmp td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+.cmp .num { text-align: right; }
+.cmp tr.me td { font-weight: 600; }
+.cmp-n { display: inline-flex; align-items: center; gap: 7px; }
+.cmp .chip-t, .cmp-me { display: inline-block; max-width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+.add-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.add-row .lbl { flex-basis: 100%; }
 
 /* ---------- empty state, toast, modal */
 .empty { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); pointer-events: none; }
@@ -362,7 +386,7 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
         <button class="btn" id="zFit" title="Fit the tree to the screen (F)">Fit</button>
         <button class="btn icon" id="zIn" aria-label="Zoom in">+</button>
       </div>
-      <button class="btn" id="dataBtn">Export<span class="wide-only"> / Import</span></button>
+      <button class="btn" id="dataBtn">Export<span class="wide-only">/ Import</span></button>
     </div>
     <div class="save wait" id="saveState" role="status"><span class="sdot"></span><span class="stxt">Connecting…</span></div>
   </header>
@@ -419,8 +443,19 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
 const W = 236, H = 84, GAP = 64, COLW = W + GAP, ROWH = 104, PADX = 56, PADY = 52;
 const KMIN = 0.3, KMAX = 1.8;
 const STATUSES = ['todo', 'active', 'done', 'dropped'];
-const STATUS_LABEL = { todo: 'Not started', active: 'Researching', done: 'Done', dropped: 'Dropped' };
+// A task is work you finish. A route is a direction you explore: its follow-ups open while it is
+// being explored, and only adopting it (a route's "done") supersedes its alternatives.
+const STATUS_LABEL = {
+  task: { todo: 'Not started', active: 'Researching', done: 'Done', dropped: 'Dropped' },
+  route: { todo: 'Not explored', active: 'Exploring', done: 'Adopted', dropped: 'Abandoned' },
+};
 const DS_LABEL = { done: 'Done', active: 'Researching', available: 'Available', locked: 'Locked', superseded: 'Superseded', blocked: 'Cut off', dropped: 'Dropped' };
+const ROUTE_DS_LABEL = { done: 'Adopted', active: 'Exploring', available: 'Ready to explore', dropped: 'Abandoned' };
+const LEGEND_LABEL = { done: 'Done / adopted', active: 'Researching / exploring', dropped: 'Dropped / abandoned' };
+const ROUTE_HELP = 'A task is work you finish. A route is a direction you explore: its follow-ups open while you explore it, and only adopting it supersedes its alternatives.';
+const isRoute = n => !!n && n.type === 'route';
+const dsLabel = (ds, n) => (isRoute(n) && ROUTE_DS_LABEL[ds]) || DS_LABEL[ds];
+const satisfies = n => n.status === 'done' || (n.type === 'route' && n.status === 'active');
 const DS_ORDER = ['done', 'active', 'available', 'locked', 'superseded', 'blocked', 'dropped'];
 const KINDS = ['Model', 'Calibration', 'Data', 'Estimation', 'Robustness', 'Writing', 'Other'];
 const DATA_KEY = 'research-tech-tree:data:v1';
@@ -486,6 +521,7 @@ function normNode(id, r, i) {
     findings: typeof r.findings === 'string' ? r.findings : '',
     status: STATUSES.includes(r.status) ? r.status : 'todo',
     kind: KINDS.includes(r.kind) ? r.kind : 'Other',
+    type: r.type === 'route' ? 'route' : 'task',
     effort: Number.isFinite(eff) && eff >= 0 ? eff : null,
     progress: clamp(Math.round(Number(r.progress) || 0), 0, 100),
     prereqs: Array.isArray(r.prereqs) ? r.prereqs.filter(x => typeof x === 'string') : [],
@@ -566,22 +602,38 @@ function computeDerived(p) {
     if (out[id]) return out[id];
     out[id] = 'locked';
     const n = N[id];
+    const pre = n.prereqs.filter(q => N[q]);
+    const st = pre.map(ds);
     let s;
     if (n.status === 'done') s = 'done';
     else if (n.status === 'dropped') s = 'dropped';
-    else if (n.status === 'active') s = 'active';
     else if (n.alts.some(a => N[a] && N[a].status === 'done')) s = 'superseded';
-    else {
-      const pre = n.prereqs.filter(q => N[q]);
-      const st = pre.map(ds);
-      if (st.some(x => x === 'dropped' || x === 'blocked' || x === 'superseded')) s = 'blocked';
-      else if (pre.every(q => N[q].status === 'done')) s = 'available';
-      else s = 'locked';
-    }
+    else if (n.status === 'active') s = 'active';
+    else if (st.some(x => x === 'dropped' || x === 'blocked' || x === 'superseded')) s = 'blocked';
+    else if (pre.every(q => satisfies(N[q]))) s = 'available';
+    else s = 'locked';
     return (out[id] = s);
   };
   for (const id in N) ds(id);
   return out;
+}
+// Tasks reachable below a node (sub-routes included), as feedback on how a route is going.
+function tally(p, id, lay = L, der = D) {
+  const seen = new Set(), stack = [...(lay.children[id] || [])];
+  const t = { total: 0, done: 0, active: 0, left: 0, unest: 0 };
+  while (stack.length) {
+    const c = stack.pop();
+    if (seen.has(c)) continue;
+    seen.add(c);
+    stack.push(...(lay.children[c] || []));
+    const m = p.nodes[c];
+    if (isRoute(m) || der[c] === 'dropped' || der[c] === 'superseded' || der[c] === 'blocked') continue;
+    t.total++;
+    if (m.status === 'done') { t.done++; continue; }
+    if (m.status === 'active') t.active++;
+    if (m.effort != null) t.left += m.effort; else t.unest++;
+  }
+  return t;
 }
 
 // Tiers are prerequisite depth. Each idea hangs under its deepest prerequisite, so the
@@ -652,8 +704,8 @@ function exampleProject() {
     name: 'Two-country HKT calibration', created: t, updated: t, order: 0,
     nodes: {
       base: mk(0, { title: 'Two-country HKT model calibration', kind: 'Calibration', status: 'done', notes: 'Current model and baseline calibration. The ideas to the right revise it.' }),
-      altprod: mk(1, { title: 'Consider an alternative production model', kind: 'Model', prereqs: ['base'], alts: ['keep'], notes: 'Replace the production side of the model instead of patching the current calibration.' }),
-      keep: mk(2, { title: 'Keep the existing model', kind: 'Model', prereqs: ['base'], alts: ['altprod'], notes: 'Accept the current production structure and fix the calibration within it.' }),
+      altprod: mk(1, { title: 'Consider an alternative production model', type: 'route', status: 'active', kind: 'Model', prereqs: ['base'], alts: ['keep'], notes: 'Replace the production side of the model instead of patching the current calibration.' }),
+      keep: mk(2, { title: 'Keep the existing model', type: 'route', status: 'active', kind: 'Model', prereqs: ['base'], alts: ['altprod'], notes: 'Accept the current production structure and fix the calibration within it.' }),
       wage: mk(3, { title: 'Check the 23–24 wage premium', kind: 'Data', prereqs: ['keep'], notes: 'Look into the 23–24 wage premium problem.' }),
       reorder: mk(4, { title: 'Reorder the calibration', kind: 'Calibration', prereqs: ['keep'], notes: 'Calibrate the markup internally; discipline the R&D labor share externally.' }),
     },
@@ -798,14 +850,15 @@ function removeFromGroup(p, id) {
   for (const a of n.alts) if (p.nodes[a]) p.nodes[a].alts = p.nodes[a].alts.filter(x => x !== id);
   n.alts = [];
 }
-function addIdea(kind) {
+function addIdea(kind, type) {
   const p = cur();
   if (!p || state.readOnly) return;
   const base = state.sel ? p.nodes[state.sel] : null;
   if (!base) kind = 'root';
+  const t = type || (base && (kind === 'parallel' || kind === 'alt') ? base.type : 'task');
   let newId = null;
   mutate(p => {
-    const props = { kind: base ? base.kind : 'Other' };
+    const props = { kind: base ? base.kind : 'Other', type: t, title: t === 'route' ? 'New route' : 'New idea' };
     if (kind === 'follow') props.prereqs = [base.id];
     else if (kind === 'parallel' || kind === 'alt') props.prereqs = base.prereqs.slice();
     const n = makeNode(props);
@@ -838,13 +891,21 @@ function deleteNode(id) {
 function setStatus(id, s) {
   const p = cur();
   if (!p || !p.nodes[id] || p.nodes[id].status === s) return;
-  const before = new Set(Object.keys(D).filter(k => D[k] === 'available'));
+  const was = { ...D };
   mutate(p => { const n = p.nodes[id]; n.status = s; n.updated = nowISO(); }, { insp: true });
-  const opened = Object.keys(D).filter(k => D[k] === 'available' && !before.has(k) && k !== id);
-  if (s === 'done' && opened.length) {
-    const names = opened.map(k => `“${trunc(cur().nodes[k].title, 32)}”`);
-    toast(`Unlocked ${names.slice(0, 3).join(', ')}${names.length > 3 ? ` and ${names.length - 3} more` : ''}`);
-  }
+  const N = cur().nodes;
+  const names = ids => { const a = ids.map(k => `“${trunc(N[k].title, 30)}”`); return a.slice(0, 3).join(', ') + (a.length > 3 ? ` and ${a.length - 3} more` : ''); };
+  const changedTo = st => Object.keys(D).filter(k => k !== id && D[k] === st && was[k] !== st);
+  const opened = changedTo('available'), sup = changedTo('superseded');
+  const msg = [];
+  if (opened.length) msg.push(`Unlocked ${names(opened)}.`);
+  if (sup.length) msg.push(`Superseded ${names(sup)}.`);
+  if (msg.length) toast(msg.join(' '));
+}
+function setType(id, type) {
+  const p = cur();
+  if (!p || !p.nodes[id] || p.nodes[id].type === type) return;
+  mutate(p => { p.nodes[id].type = type; p.nodes[id].updated = nowISO(); }, { insp: true });
 }
 function linkPrereq(targetId, fromId) {
   const p = cur();
@@ -984,6 +1045,18 @@ function medal(ds, prog) {
     default: return o + '<circle cx="20" cy="20" r="15" class="m-ring-cut" fill="none"/><path d="M14 26l12-12" class="m-cut" fill="none"/></svg>';
   }
 }
+function routeMedal(ds, t) {
+  const o = '<svg viewBox="0 0 40 40" aria-hidden="true">', dia = 'M20 3L37 20L20 37L3 20Z';
+  switch (ds) {
+    case 'done': return o + `<path d="${dia}" class="m-done"/><path d="M13 20.5l4.5 4.5 9.5-10" class="m-check" fill="none"/></svg>`;
+    case 'active': return o + `<path d="${dia}" class="r-active"/>` + (t.total ? `<text x="20" y="23.2" class="r-tally">${t.done}/${t.total}</text>` : '<path d="M20 16L24 20L20 24L16 20Z" class="m-dot-avail" style="fill:var(--active)"/>') + '</svg>';
+    case 'available': return o + `<path d="${dia}" class="r-avail" fill="none"/><path d="M20 14L26 20L20 26L14 20Z" class="m-dot-avail"/></svg>`;
+    case 'locked': return o + `<path d="${dia}" class="m-lockbg"/><path d="M17 19.5v-2a3 3 0 0 1 6 0v2" class="m-shackle" fill="none"/><rect x="15" y="19" width="10" height="7.5" rx="1.5" class="m-lock"/></svg>`;
+    case 'dropped': return o + `<path d="${dia}" class="m-ring-drop" fill="none"/><path d="M15.5 15.5l9 9M24.5 15.5l-9 9" class="m-x" fill="none"/></svg>`;
+    case 'superseded': return o + `<path d="${dia}" class="m-ring-dash" fill="none"/><path d="M14.5 20h11" class="m-dash" fill="none"/></svg>`;
+    default: return o + `<path d="${dia}" class="m-ring-cut" fill="none"/><path d="M15 25l10-10" class="m-cut" fill="none"/></svg>`;
+  }
+}
 function renderWorld(p) {
   const N = p.nodes, nodes = sortedNodes(p);
   el.world.style.width = L.width + 'px';
@@ -1007,7 +1080,7 @@ function renderWorld(p) {
     else {
       const dq = D[q], dn = D[n.id];
       const faint = dq === 'dropped' || dq === 'superseded' || dq === 'blocked' || dn === 'dropped' || dn === 'superseded' || dn === 'blocked';
-      cls = faint ? 'e e-faint' : N[q].status === 'done' ? 'e e-done' : 'e e-open';
+      cls = faint ? 'e e-faint' : N[q].status === 'done' ? 'e e-done' : satisfies(N[q]) ? 'e e-explore' : 'e e-open';
     }
     const path = `<path class="${cls}" d="${d}"/>`;
     if (onPath || next) top += path; else base += path;
@@ -1018,12 +1091,19 @@ function renderWorld(p) {
 
   let html = '';
   for (const n of nodes) {
-    const ds = D[n.id], pos = L.pos[n.id], unl = (L.children[n.id] || []).length;
-    const meta = [`<span class="kind">${esc(n.kind)}</span>`];
-    if (n.effort != null) meta.push(`<span title="Estimated effort">~${fmtEff(n.effort)}</span>`);
+    const ds = D[n.id], pos = L.pos[n.id], unl = (L.children[n.id] || []).length, route = isRoute(n);
+    const t = route ? tally(p, n.id) : null;
+    const meta = [];
+    if (route) {
+      meta.push('<span class="kind k-route">Route</span>');
+      if (t.total) meta.push(`<span title="Tasks under this route that are done">${t.done}/${t.total}</span>`);
+    } else {
+      meta.push(`<span class="kind">${esc(n.kind)}</span>`);
+      if (n.effort != null) meta.push(`<span title="Estimated effort">~${fmtEff(n.effort)}</span>`);
+    }
     if (unl) meta.push(`<span title="Unlocks ${unl} idea${unl > 1 ? 's' : ''}">&rarr;&thinsp;${unl}</span>`);
-    html += `<div class="node s-${ds}${n.id === sel ? ' sel' : ''}${anc.has(n.id) ? ' anc' : ''}" data-id="${esc(n.id)}" style="left:${pos.x}px;top:${pos.y}px" tabindex="0" role="button" title="${esc(n.title)}" aria-label="${esc(n.title)}: ${DS_LABEL[ds]}">`
-      + `<div class="medal">${medal(ds, n.progress)}</div>`
+    html += `<div class="node${route ? ' route' : ''} s-${ds}${n.id === sel ? ' sel' : ''}${anc.has(n.id) ? ' anc' : ''}" data-id="${esc(n.id)}" style="left:${pos.x}px;top:${pos.y}px" tabindex="0" role="button" title="${esc(n.title)}" aria-label="${esc(n.title)}: ${route ? 'route, ' : ''}${dsLabel(ds, n)}">`
+      + `<div class="medal">${route ? routeMedal(ds, t) : medal(ds, n.progress)}</div>`
       + `<div class="nbody"><div class="ntitle">${esc(n.title || 'Untitled idea')}</div><div class="nmeta">${meta.join('')}</div></div>`
       + (state.readOnly ? '' : `<span class="port" data-port="${esc(n.id)}" title="Drag onto a later idea to make this its prerequisite"></span>`)
       + '</div>';
@@ -1061,87 +1141,144 @@ function renderFrontier() {
   const counts = {};
   DS_ORDER.forEach(s => { counts[s] = 0; });
   nodes.forEach(n => { counts[D[n.id]]++; });
-  const act = nodes.filter(n => D[n.id] === 'active');
+  const tasks = nodes.filter(n => !isRoute(n));
+  const routesOpen = nodes.filter(n => isRoute(n) && D[n.id] === 'active');
+  const act = tasks.filter(n => D[n.id] === 'active');
   const av = nodes.filter(n => D[n.id] === 'available');
-  const bar = DS_ORDER.filter(s => counts[s]).map(s => `<span class="seg-${s}" style="flex:${counts[s]}" title="${DS_LABEL[s]}: ${counts[s]}"></span>`).join('');
-  const item = n => `<button class="fr-item" data-goto="${esc(n.id)}"><i class="dot s-${D[n.id]}"></i><span class="fr-t">${esc(n.title || 'Untitled idea')}</span><span class="fr-m">${D[n.id] === 'active' ? n.progress + '%' : n.effort != null ? '~' + fmtEff(n.effort) : ''}</span></button>`;
+  const doneTasks = tasks.filter(n => n.status === 'done').length;
+  const dropped = nodes.filter(n => n.status === 'dropped').length;
+  const bar = DS_ORDER.filter(s => counts[s]).map(s => `<span class="seg-${s}" style="flex:${counts[s]}" title="${LEGEND_LABEL[s] || DS_LABEL[s]}: ${counts[s]}"></span>`).join('');
+  const side = n => {
+    if (isRoute(n)) { const t = tally(p, n.id); return t.total ? `${t.done}/${t.total}` : ''; }
+    return D[n.id] === 'active' ? n.progress + '%' : n.effort != null ? '~' + fmtEff(n.effort) : '';
+  };
+  const item = n => `<button class="fr-item" data-goto="${esc(n.id)}"><i class="dot s-${D[n.id]}${isRoute(n) ? ' route' : ''}"></i><span class="fr-t">${esc(n.title || 'Untitled idea')}</span><span class="fr-m"${isRoute(n) ? ' title="Tasks done under this route"' : ''}>${side(n)}</span></button>`;
   const body = el.frontier.querySelector('.fr-body');
   const scroll = body ? body.scrollTop : 0;
-  el.frontier.innerHTML = `<button class="fr-head" id="frToggle" aria-expanded="${open}"><span class="fr-name">Frontier</span><span class="fr-count num" title="Ideas you can work on now">${act.length + av.length}</span><svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none"/></svg></button>`
+  el.frontier.innerHTML = `<button class="fr-head" id="frToggle" aria-expanded="${open}"><span class="fr-name">Frontier</span><span class="fr-count num" title="Tasks in progress plus ideas you can start now">${act.length + av.length}</span><svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none"/></svg></button>`
     + `<div class="fr-body"${open ? '' : ' hidden'}>`
-    + `<div class="fr-summary"><div class="fr-bar">${bar}</div><div class="fr-stats"><span class="num">${counts.done}</span> of <span class="num">${nodes.length}</span> ideas done${counts.dropped ? ` · <span class="num">${counts.dropped}</span> dropped` : ''}</div></div>`
+    + `<div class="fr-summary"><div class="fr-bar">${bar}</div><div class="fr-stats"><span class="num">${doneTasks}</span> of <span class="num">${tasks.length}</span> tasks done${routesOpen.length ? ` · <span class="num">${routesOpen.length}</span> route${routesOpen.length > 1 ? 's' : ''} open` : ''}${dropped ? ` · <span class="num">${dropped}</span> dropped` : ''}</div></div>`
+    + (routesOpen.length ? `<h3 class="fr-h">Open routes</h3>${routesOpen.map(item).join('')}` : '')
     + `<h3 class="fr-h">Researching</h3>${act.length ? act.map(item).join('') : '<p class="fr-none">Nothing in progress. Start one of the available ideas.</p>'}`
-    + `<h3 class="fr-h">Available</h3>${av.length ? av.map(item).join('') : '<p class="fr-none">Nothing is unlocked right now. Finish a prerequisite to open the next ideas.</p>'}`
-    + `<div class="legend">${DS_ORDER.map(s => `<span><i class="dot s-${s}"></i>${DS_LABEL[s]}</span>`).join('')}</div>`
-    + '<p class="keys edit-only"><kbd>N</kbd> follow-up · <kbd>P</kbd> parallel idea · <kbd>F</kbd> fit · <kbd>Del</kbd> delete · <kbd>Ctrl Z</kbd> undo. Drag the dot on a card\'s right edge onto another card to link them.</p>'
+    + `<h3 class="fr-h">Available</h3>${av.length ? av.map(item).join('') : '<p class="fr-none">Nothing is unlocked right now. Finish a task or start exploring a route to open the next ideas.</p>'}`
+    + `<div class="legend">${DS_ORDER.map(s => `<span><i class="dot s-${s}"></i>${LEGEND_LABEL[s] || DS_LABEL[s]}</span>`).join('')}<span><i class="dot shape"></i>Task</span><span><i class="dot shape route"></i>Route</span></div>`
+    + '<p class="keys edit-only"><kbd>N</kbd> task · <kbd>R</kbd> route · <kbd>P</kbd> parallel · <kbd>F</kbd> fit · <kbd>Del</kbd> delete · <kbd>Ctrl Z</kbd> undo. Drag the dot on a card\'s right edge onto another card to link them.</p>'
     + '</div>';
   const nb = el.frontier.querySelector('.fr-body');
   if (nb) nb.scrollTop = scroll;
 }
+const joinAnd = a => (a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]);
 function why(p, n, ds) {
-  const N = p.nodes;
-  const names = ids => ids.map(id => `“${esc(trunc(N[id].title, 36))}”`).join(', ');
+  const N = p.nodes, route = isRoute(n);
+  const q = id => `“${esc(trunc(N[id].title, 36))}”`;
   switch (ds) {
-    case 'done': return n.findings ? 'Done.' : 'Done. Note what you learned under Findings.';
-    case 'active': return `In progress, ${n.progress}% along.`;
-    case 'available': return n.prereqs.length ? 'All prerequisites are done. Ready to start.' : 'A starting point with no prerequisites. Ready to start.';
-    case 'locked': { const w = n.prereqs.filter(q => N[q].status !== 'done'); return `Locked until ${names(w)} ${w.length > 1 ? 'are' : 'is'} done.`; }
-    case 'superseded': return `Superseded, because the alternative ${names(n.alts.filter(a => N[a].status === 'done'))} is done.`;
-    case 'blocked': return `Cut off, because ${names(n.prereqs.filter(q => ['dropped', 'blocked', 'superseded'].includes(D[q])))} will not be done. Drop this idea or link it to another prerequisite.`;
-    default: return 'Dropped. Ideas that depend on it are cut off.';
+    case 'done':
+      if (route) return `Adopted.${n.alts.length ? ' Its alternatives are superseded.' : ''}${n.findings ? '' : ' Record why under Evidence.'}`;
+      return n.findings ? 'Done.' : 'Done. Note what you learned under Findings.';
+    case 'active':
+      if (route) return `Exploring, so its follow-ups are open. Mark it Adopted once the evidence favors it${n.alts.length ? '; that supersedes its alternatives' : ''}.`;
+      return `In progress, ${n.progress}% along.`;
+    case 'available':
+      if (route) return n.prereqs.length ? 'All prerequisites are met. Set it to Exploring to open its follow-ups.' : 'A starting route. Set it to Exploring to open its follow-ups.';
+      return n.prereqs.length ? 'All prerequisites are met. Ready to start.' : 'A starting point with no prerequisites. Ready to start.';
+    case 'locked': {
+      const w = n.prereqs.filter(id => !satisfies(N[id]));
+      return `Locked. Waiting for ${joinAnd(w.map(id => q(id) + (isRoute(N[id]) ? ' to be explored' : ' to be done')))}.`;
+    }
+    case 'superseded': {
+      const w = n.alts.filter(a => N[a].status === 'done');
+      return `Superseded, because ${joinAnd(w.map(q))} ${w.length > 1 ? 'were' : 'was'} chosen instead.`;
+    }
+    case 'blocked':
+      return `Cut off, because ${joinAnd(n.prereqs.filter(id => ['dropped', 'blocked', 'superseded'].includes(D[id])).map(q))} will not go ahead. ${route ? 'Abandon this route' : 'Drop this idea'} or link it to another prerequisite.`;
+    default:
+      return route ? 'Abandoned. Follow-ups under it are cut off.' : 'Dropped. Ideas that depend on it are cut off.';
   }
 }
 function pathInfo(p, n) {
-  if (n.status === 'done') return '';
-  const open = [...ancestors(p, n.id)].map(id => p.nodes[id]).filter(m => m.status !== 'done');
+  if (satisfies(n)) return '';
+  const open = [...ancestors(p, n.id)].map(id => p.nodes[id]).filter(m => !satisfies(m));
   const all = [...open, n];
-  const est = all.filter(m => m.effort != null);
+  const work = all.filter(m => !isRoute(m));
+  const est = work.filter(m => m.effort != null);
   const sum = est.reduce((s, m) => s + m.effort, 0);
-  const unk = all.length - est.length;
+  const unk = work.length - est.length;
   const dead = open.some(m => m.status === 'dropped');
-  return `<div class="pathbox"><span class="lbl">Route to this idea</span>`
+  return `<div class="pathbox"><span class="lbl">Route to this ${isRoute(n) ? 'route' : 'idea'}</span>`
     + `<p><b class="num">${all.length}</b> open step${all.length > 1 ? 's' : ''}${est.length ? ` · <b class="num">~${fmtEff(sum)}</b> estimated` : ''}${unk ? ` · ${unk} without an estimate` : ''}</p>`
-    + (dead ? '<p class="warn">The route runs through a dropped idea.</p>' : '')
-    + (open.length ? '<p class="hint">The blue lines on the tree trace this route.</p>' : '')
+    + (dead ? '<p class="warn">The way there runs through a dropped idea.</p>' : '')
+    + (open.length ? '<p class="hint">The blue lines on the tree trace it.</p>' : '')
     + '</div>';
+}
+function routeBox(p, n) {
+  const t = tally(p, n.id);
+  if (!t.total) return '<div class="routebox"><span class="lbl">Tasks under this route</span><p>None yet. Add the work that would test this route with + Task below.</p></div>';
+  const bits = [`<b class="num">${t.done}</b> of <b class="num">${t.total}</b> done`];
+  if (t.active) bits.push(`${t.active} researching`);
+  if (t.left) bits.push(`<b class="num">~${fmtEff(t.left)}</b> left`);
+  if (t.unest) bits.push(`${t.unest} without an estimate`);
+  return `<div class="routebox"><span class="lbl">Tasks under this route</span><p>${bits.join(' · ')}</p></div>`;
+}
+function compareAlts(p, n) {
+  if (!n.alts.length) return '';
+  const N = p.nodes;
+  const rows = [n.id, ...n.alts].sort((a, b) => N[a].seq - N[b].seq).map(id => {
+    const m = N[id], t = isRoute(m) ? tally(p, id) : null;
+    const tasks = t ? (t.total ? `${t.done}/${t.total}` : '–') : (m.status === 'done' ? '1/1' : '0/1');
+    const left = t ? (t.left ? '~' + fmtEff(t.left) : '–') : (m.status !== 'done' && m.effort != null ? '~' + fmtEff(m.effort) : '–');
+    const name = id === n.id
+      ? `<span class="cmp-me" title="${esc(m.title)}">${esc(m.title || 'Untitled idea')}</span>`
+      : `<button class="chip-t" data-act="goto" data-id="${esc(id)}" title="${esc(m.title)}">${esc(m.title || 'Untitled idea')}</button>`;
+    return `<tr${id === n.id ? ' class="me"' : ''}><td><span class="cmp-n"><i class="dot s-${D[id]}${isRoute(m) ? ' route' : ''}"></i>${name}</span></td><td>${dsLabel(D[id], m)}</td><td class="num">${tasks}</td><td class="num">${left}</td></tr>`;
+  });
+  return `<section class="field"><h4 class="lbl">Compare alternatives</h4><div class="cmp-wrap"><table class="cmp"><thead><tr><th>${isRoute(n) ? 'Route' : 'Idea'}</th><th>Status</th><th class="num">Tasks</th><th class="num">Left</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`
+    + `<p class="hint">${isRoute(n) ? 'Explore routes side by side. Adopting one supersedes the others.' : 'Finishing one supersedes the others.'}</p></section>`;
 }
 function renderInspector() {
   const p = cur();
   const n = p && state.sel ? p.nodes[state.sel] : null;
   if (!n || !L) { el.insp.hidden = true; el.insp.innerHTML = ''; return; }
   const N = p.nodes, ds = D[n.id] || 'locked', ro = state.readOnly ? ' disabled' : '';
-  const chip = (id, rm) => `<span class="chip"><i class="dot s-${D[id]}"></i><button class="chip-t" data-act="goto" data-id="${esc(id)}" title="${esc(N[id].title)}">${esc(trunc(N[id].title || 'Untitled idea', 38))}</button>${rm && !state.readOnly ? `<button class="chip-x" data-act="${rm}" data-id="${esc(id)}" aria-label="Remove ${esc(N[id].title)}">&times;</button>` : ''}</span>`;
+  const route = isRoute(n), type = route ? 'route' : 'task';
+  const chip = (id, rm) => `<span class="chip"><i class="dot s-${D[id]}${isRoute(N[id]) ? ' route' : ''}"></i><button class="chip-t" data-act="goto" data-id="${esc(id)}" title="${esc(N[id].title)}">${esc(trunc(N[id].title || 'Untitled idea', 38))}</button>${rm && !state.readOnly ? `<button class="chip-x" data-act="${rm}" data-id="${esc(id)}" aria-label="Remove ${esc(N[id].title)}">&times;</button>` : ''}</span>`;
   const list = (ids, rm, none) => ids.length ? `<div class="chips">${ids.map(id => chip(id, rm)).join('')}</div>` : `<p class="none">${none}</p>`;
   const bySeq = ids => ids.slice().sort((a, b) => N[a].seq - N[b].seq);
   const preOpts = state.readOnly ? [] : sortedNodes(p).filter(m => m.id !== n.id && !n.prereqs.includes(m.id) && !dependsOn(p, m.id, n.id));
   const altOpts = state.readOnly ? [] : sortedNodes(p).filter(m => m.id !== n.id && !n.alts.includes(m.id) && !dependsOn(p, m.id, n.id) && !dependsOn(p, n.id, m.id));
-  const adder = (kind, opts, label) => opts.length ? `<select class="addsel" data-add="${kind}" aria-label="${label}"><option value="">+ ${label}…</option>${opts.map(m => `<option value="${esc(m.id)}">${esc(trunc(m.title || 'Untitled idea', 50))}</option>`).join('')}</select>` : '';
+  const adder = (kind, opts, label) => opts.length ? `<select class="addsel" data-add="${kind}" aria-label="${label}"><option value="">+ ${label}…</option>${opts.map(m => `<option value="${esc(m.id)}">${isRoute(m) ? 'Route: ' : ''}${esc(trunc(m.title || 'Untitled idea', 50))}</option>`).join('')}</select>` : '';
   el.insp.hidden = false;
-  el.insp.innerHTML = `<div class="i-top"><span class="pill s-${ds}">${DS_LABEL[ds]}</span><span class="i-tier">Tier ${roman(L.pos[n.id].d + 1)}</span><button class="icon-btn" data-act="close" aria-label="Close details">&times;</button></div>`
-    + `<label class="sr" for="f-title">Idea title</label><textarea id="f-title" class="i-title" data-f="title" rows="2" maxlength="200" placeholder="Name this idea"${ro}>${esc(n.title)}</textarea>`
-    + `<div class="seg" role="group" aria-label="Status">${STATUSES.map(s => `<button data-status="${s}" class="${n.status === s ? 'on' : ''}" aria-pressed="${n.status === s}"${ro}>${STATUS_LABEL[s]}</button>`).join('')}</div>`
+  el.insp.innerHTML = `<div class="i-top"><span class="pill s-${ds}">${dsLabel(ds, n)}</span><span class="i-tier">Tier ${roman(L.pos[n.id].d + 1)}</span><span class="grow"></span>`
+    + `<div class="mini-seg type-seg" role="group" aria-label="Node type" title="${ROUTE_HELP}">${['task', 'route'].map(t => `<button data-type="${t}" class="${type === t ? 'on' : ''}" aria-pressed="${type === t}"${ro}>${t === 'task' ? 'Task' : 'Route'}</button>`).join('')}</div>`
+    + '<button class="icon-btn" data-act="close" aria-label="Close details">&times;</button></div>'
+    + `<label class="sr" for="f-title">Title</label><textarea id="f-title" class="i-title" data-f="title" rows="2" maxlength="200" placeholder="${route ? 'Name this route' : 'Name this idea'}"${ro}>${esc(n.title)}</textarea>`
+    + `<div class="seg" role="group" aria-label="Status">${STATUSES.map(s => `<button data-status="${s}" class="${n.status === s ? 'on' : ''}" aria-pressed="${n.status === s}"${ro}>${STATUS_LABEL[type][s]}</button>`).join('')}</div>`
     + `<p class="why">${why(p, n, ds)}</p>`
-    + (n.status === 'active' ? `<div class="field"><label class="lbl" for="f-prog">Progress <span class="num" id="progVal">${n.progress}%</span></label><input id="f-prog" type="range" min="0" max="100" step="5" value="${n.progress}" data-f="progress"${ro}></div>` : '')
+    + (!route && n.status === 'active' ? `<div class="field"><label class="lbl" for="f-prog">Progress <span class="num" id="progVal">${n.progress}%</span></label><input id="f-prog" type="range" min="0" max="100" step="5" value="${n.progress}" data-f="progress"${ro}></div>` : '')
+    + (route ? routeBox(p, n) : '')
     + `<div class="row2"><div class="field"><label class="lbl" for="f-kind">Kind</label><select id="f-kind" data-f="kind"${ro}>${KINDS.map(k => `<option${k === n.kind ? ' selected' : ''}>${k}</option>`).join('')}</select></div>`
-    + `<div class="field"><label class="lbl" for="f-eff">Effort, days</label><input id="f-eff" class="num" type="number" min="0" step="0.5" inputmode="decimal" data-f="effort" placeholder="Not estimated" value="${n.effort == null ? '' : n.effort}"${ro}></div></div>`
+    + (route ? '' : `<div class="field"><label class="lbl" for="f-eff">Effort, days</label><input id="f-eff" class="num" type="number" min="0" step="0.5" inputmode="decimal" data-f="effort" placeholder="Not estimated" value="${n.effort == null ? '' : n.effort}"${ro}></div>`)
+    + '</div>'
     + `<section class="field"><h4 class="lbl">Requires</h4>${list(bySeq(n.prereqs), 'rmpre', 'Nothing. This is a starting point.')}${adder('pre', preOpts, 'Add prerequisite')}</section>`
-    + `<section class="field"><h4 class="lbl">Unlocks</h4>${list(bySeq(L.children[n.id] || []), null, 'Nothing yet. Add a follow-up below.')}</section>`
-    + `<section class="field"><h4 class="lbl">Alternative to</h4>${list(bySeq(n.alts), 'rmalt', 'None. Alternatives are competing routes; finishing one supersedes the others.')}${adder('alt', altOpts, 'Add alternative')}</section>`
-    + `<div class="field"><label class="lbl" for="f-notes">Plan</label><textarea id="f-notes" data-f="notes" rows="4" placeholder="What is the idea, and how would you test it?"${ro}>${esc(n.notes)}</textarea></div>`
-    + `<div class="field"><label class="lbl" for="f-find">Findings</label><textarea id="f-find" data-f="findings" rows="3" placeholder="What did you learn? Dead ends count too."${ro}>${esc(n.findings)}</textarea></div>`
+    + `<section class="field"><h4 class="lbl">Unlocks</h4>${list(bySeq(L.children[n.id] || []), null, route ? 'Nothing yet. Add the tasks that would test this route below.' : 'Nothing yet. Add a follow-up below.')}</section>`
+    + `<section class="field"><h4 class="lbl">Alternative to</h4>${list(bySeq(n.alts), 'rmalt', 'None. Alternatives are competing ideas or routes with the same starting point.')}${adder('alt', altOpts, 'Add alternative')}</section>`
+    + compareAlts(p, n)
+    + `<div class="field"><label class="lbl" for="f-notes">${route ? 'Hypothesis' : 'Plan'}</label><textarea id="f-notes" data-f="notes" rows="4" placeholder="${route ? 'What would have to be true for this route to work?' : 'What is the idea, and how would you test it?'}"${ro}>${esc(n.notes)}</textarea></div>`
+    + `<div class="field"><label class="lbl" for="f-find">${route ? 'Evidence' : 'Findings'}</label><textarea id="f-find" data-f="findings" rows="3" placeholder="${route ? 'What do the results so far say for or against this route?' : 'What did you learn? Dead ends count too.'}"${ro}>${esc(n.findings)}</textarea></div>`
     + pathInfo(p, n)
-    + '<div class="i-acts edit-only"><button class="btn" data-act="follow" title="An idea that needs this one first (N)">+ Follow-up</button><button class="btn" data-act="parallel" title="An idea with the same prerequisites (P)">+ Parallel</button><button class="btn" data-act="alt" title="A competing route with the same prerequisites">+ Alternative</button></div>'
-    + '<div class="i-acts2 edit-only"><span class="lbl">Order</span><button class="btn sm" data-act="up" aria-label="Move up among siblings">&uarr;</button><button class="btn sm" data-act="down" aria-label="Move down among siblings">&darr;</button><span class="grow"></span><button class="btn danger" data-act="del">Delete idea</button></div>'
+    + '<div class="add-row edit-only"><span class="lbl">Add after this</span><button class="btn" data-act="follow" title="A task that needs this first (N)">+ Task</button><button class="btn" data-act="follow-route" title="A direction that branches off from here (R)">+ Route</button></div>'
+    + '<div class="add-row edit-only"><span class="lbl">Add beside this</span><button class="btn" data-act="parallel" title="Same prerequisites, pursued alongside (P)">+ Parallel</button><button class="btn" data-act="alt" title="Same prerequisites, competing with this one">+ Alternative</button></div>'
+    + '<div class="i-acts2 edit-only"><span class="lbl">Order</span><button class="btn sm" data-act="up" aria-label="Move up among siblings">&uarr;</button><button class="btn sm" data-act="down" aria-label="Move down among siblings">&darr;</button><span class="grow"></span><button class="btn danger" data-act="del">Delete</button></div>'
     + `<p class="i-meta">Added ${fmtDate(n.created)} · edited ${fmtDate(n.updated)}</p>`;
 }
 
 // ---------- selection and camera
 function select(id, { center = false, force = false, focus = false } = {}) {
-  const p = cur();
+  const p = cur(), prev = state.sel;
   state.sel = p && id && p.nodes[id] ? id : null;
   lastCo = null;
   render();
   renderInspector();
+  if (state.sel !== prev) el.insp.scrollTop = 0;
   if (center && state.sel) centerOn(state.sel, force);
   if (focus && state.sel) { const t = $('f-title'); if (t && !t.disabled) { t.focus({ preventScroll: true }); t.select(); } }
 }
@@ -1238,18 +1375,21 @@ el.viewport.addEventListener('pointermove', e => {
     applyView();
   }
 });
-// A tap selects on pointerup and may open the inspector under the finger or cursor;
-// the browser's follow-up click must not land on whatever button is now there.
-function swallowClick() {
-  const h = ev => { ev.stopPropagation(); ev.preventDefault(); };
-  document.addEventListener('click', h, { capture: true, once: true });
-  setTimeout(() => document.removeEventListener('click', h, { capture: true }), 450);
-}
+// A tap selects on pointerup and may open the inspector under the finger or cursor; the
+// browser's follow-up click (same spot, moments later) must not land on whatever is there now.
+let lastTap = null;
+function swallowClick(x, y) { lastTap = { x, y, t: performance.now() }; }
+document.addEventListener('click', ev => {
+  if (!lastTap) return;
+  const ghost = performance.now() - lastTap.t < 400 && Math.hypot(ev.clientX - lastTap.x, ev.clientY - lastTap.y) < 12;
+  lastTap = null;
+  if (ghost) { ev.stopPropagation(); ev.preventDefault(); }
+}, true);
 function endPointer(e) {
   if (!ptrs.has(e.pointerId)) return;
   ptrs.delete(e.pointerId);
   if (gesture && gesture.type === 'pan' && !gesture.moved && e.type === 'pointerup') {
-    swallowClick();
+    swallowClick(e.clientX, e.clientY);
     const nodeEl = gesture.target && gesture.target.closest ? gesture.target.closest('.node') : null;
     select(nodeEl ? nodeEl.dataset.id : null, { center: true });
   }
@@ -1310,6 +1450,12 @@ function startConnect(e, fromId) {
 }
 
 // ---------- panel and control events
+// Focusing a card must not scroll the clipped viewport itself; move the camera instead.
+el.viewport.addEventListener('scroll', () => { el.viewport.scrollLeft = 0; el.viewport.scrollTop = 0; });
+el.nodes.addEventListener('focusin', e => {
+  const n = e.target.closest('.node');
+  if (n && !gesture && e.target.matches(':focus-visible')) centerOn(n.dataset.id, false);
+});
 el.nodes.addEventListener('keydown', e => {
   const n = e.target.closest('.node');
   if (!n || (e.key !== 'Enter' && e.key !== ' ')) return;
@@ -1331,13 +1477,15 @@ el.insp.addEventListener('click', e => {
   const id = state.sel;
   if (!b || !id) return;
   if (b.dataset.status) { setStatus(id, b.dataset.status); return; }
+  if (b.dataset.type) { setType(id, b.dataset.type); return; }
   const tid = b.dataset.id;
   switch (b.dataset.act) {
     case 'close': select(null); break;
     case 'goto': select(tid, { center: true, force: true }); break;
     case 'rmpre': mutate(p => { const m = p.nodes[id]; m.prereqs = m.prereqs.filter(x => x !== tid); }, { insp: true }); break;
     case 'rmalt': mutate(p => removeFromGroup(p, tid), { insp: true }); break;
-    case 'follow': addIdea('follow'); break;
+    case 'follow': addIdea('follow', 'task'); break;
+    case 'follow-route': addIdea('follow', 'route'); break;
     case 'parallel': addIdea('parallel'); break;
     case 'alt': addIdea('alt'); break;
     case 'up': move(id, -1); break;
@@ -1434,14 +1582,15 @@ function outline(p) {
   const lay = computeLayout(p), der = computeDerived(p), N = p.nodes, lines = [`# ${p.name}`, ''];
   const walk = (id, depth) => {
     const n = N[id], pad = '  '.repeat(depth), tags = [];
-    if (der[id] !== 'done') tags.push(DS_LABEL[der[id]].toLowerCase() + (n.status === 'active' ? ` ${n.progress}%` : ''));
-    if (n.effort != null) tags.push('~' + fmtEff(n.effort));
+    if (der[id] !== 'done') tags.push(dsLabel(der[id], n).toLowerCase() + (n.status === 'active' && !isRoute(n) ? ` ${n.progress}%` : ''));
+    if (isRoute(n)) { const t = tally(p, id, lay, der); if (t.total) tags.push(`${t.done}/${t.total} tasks done`); }
+    else if (n.effort != null) tags.push('~' + fmtEff(n.effort));
     const extra = n.prereqs.filter(q => q !== lay.parent[id]);
     if (extra.length) tags.push('also needs: ' + extra.map(q => N[q].title).join('; '));
     if (n.alts.length) tags.push('alternative to: ' + n.alts.map(a => N[a].title).join('; '));
-    lines.push(`${pad}- [${n.status === 'done' ? 'x' : ' '}] ${n.title}${tags.length ? ` (${tags.join(', ')})` : ''}`);
-    if (n.notes.trim()) lines.push(`${pad}  Plan: ${n.notes.trim().replace(/\s*\n\s*/g, ' ')}`);
-    if (n.findings.trim()) lines.push(`${pad}  Findings: ${n.findings.trim().replace(/\s*\n\s*/g, ' ')}`);
+    lines.push(`${pad}- [${n.status === 'done' ? 'x' : ' '}] ${isRoute(n) ? 'Route: ' : ''}${n.title}${tags.length ? ` (${tags.join(', ')})` : ''}`);
+    if (n.notes.trim()) lines.push(`${pad}  ${isRoute(n) ? 'Hypothesis' : 'Plan'}: ${n.notes.trim().replace(/\s*\n\s*/g, ' ')}`);
+    if (n.findings.trim()) lines.push(`${pad}  ${isRoute(n) ? 'Evidence' : 'Findings'}: ${n.findings.trim().replace(/\s*\n\s*/g, ' ')}`);
     (lay.kids[id] || []).forEach(c => walk(c, depth + 1));
   };
   lay.roots.forEach(r => walk(r, 0));
@@ -1562,7 +1711,8 @@ document.addEventListener('keydown', e => {
   if (typing || e.ctrlKey || e.metaKey || e.altKey || !el.modal.hidden || !cur()) return;
   const k = e.key.toLowerCase();
   if (k === 'f') { e.preventDefault(); fit(); }
-  else if (k === 'n') { e.preventDefault(); addIdea(state.sel ? 'follow' : 'root'); }
+  else if (k === 'n') { e.preventDefault(); addIdea(state.sel ? 'follow' : 'root', 'task'); }
+  else if (k === 'r') { e.preventDefault(); addIdea(state.sel ? 'follow' : 'root', 'route'); }
   else if (k === 'p' && state.sel) { e.preventDefault(); addIdea('parallel'); }
   else if ((e.key === 'Delete' || e.key === 'Backspace') && state.sel) { e.preventDefault(); deleteNode(state.sel); }
 });
