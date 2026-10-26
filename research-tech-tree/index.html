@@ -1,0 +1,1642 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Research Tech Tree</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Marcellus+SC&display=swap">
+<style>
+/* Layout: one-screen app. A slim top bar over a pannable tree canvas; tiers run left to right like a game tech tree.
+   The Frontier list floats on the left, the idea inspector docks on the right (a bottom sheet on phones). */
+:root {
+  --bg: #E7EDF2;
+  --grid: #C6D1DC;
+  --band: #EDF2F6;
+  --surface: #FBFCFD;
+  --surface-2: #EEF2F6;
+  --ink: #15212E;
+  --muted: #5B6A79;
+  --line: #C3CED9;
+  --line-strong: #8FA0B1;
+  --accent: #946510;        /* brass: researched */
+  --accent-soft: #F4E8CC;
+  --done-bg: #FBF6EA;
+  --active: #1F5EBA;
+  --active-soft: #D9E5F7;
+  --avail: #18785B;
+  --avail-soft: #D5EDE3;
+  --drop: #A4483F;
+  --drop-soft: #F4DEDB;
+  --shadow: rgba(21, 33, 46, .12);
+  --scrim: rgba(21, 33, 46, .38);
+  --font-display: "Marcellus SC", "Iowan Old Style", Georgia, serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1620; --grid: #213042; --band: #111B26; --surface: #162130; --surface-2: #1D2A3A;
+    --ink: #E4EAF1; --muted: #93A3B4; --line: #2C3B4D; --line-strong: #50647B;
+    --accent: #DAAA48; --accent-soft: #3A2F16; --done-bg: #221E14;
+    --active: #6FA5FF; --active-soft: #1B2E4C; --avail: #48C795; --avail-soft: #14352A;
+    --drop: #E07D72; --drop-soft: #3B201D; --shadow: rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1620; --grid: #213042; --band: #111B26; --surface: #162130; --surface-2: #1D2A3A;
+  --ink: #E4EAF1; --muted: #93A3B4; --line: #2C3B4D; --line-strong: #50647B;
+  --accent: #DAAA48; --accent-soft: #3A2F16; --done-bg: #221E14;
+  --active: #6FA5FF; --active-soft: #1B2E4C; --avail: #48C795; --avail-soft: #14352A;
+  --drop: #E07D72; --drop-soft: #3B201D; --shadow: rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { height: 100%; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font-body); -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.lbl { display: block; margin: 0; font: 600 10.5px/1.3 var(--font-body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+:focus-visible { outline: 2px solid var(--active); outline-offset: 2px; }
+
+.app { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+
+/* ---------- top bar */
+.bar {
+  position: relative; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  padding-block: 9px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 9px; font: 17px/1 var(--font-display); letter-spacing: .05em; white-space: nowrap; }
+.brand svg { width: 22px; height: 22px; flex: none; }
+.brand .b-line { stroke: var(--line-strong); stroke-width: 1.6; fill: none; }
+.brand .b-done { fill: var(--accent); }
+.brand .b-av { fill: var(--surface); stroke: var(--avail); stroke-width: 1.8; }
+.brand .b-lk { fill: var(--surface-2); stroke: var(--line-strong); stroke-width: 1.4; }
+.proj { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 220px; }
+.sel, .inp, .addsel, .field select, .field input[type="number"] {
+  border: 1px solid var(--line); background: var(--surface-2); border-radius: 6px; padding: 6px 8px; min-width: 0;
+}
+.proj .sel { flex: 1 1 auto; max-width: 340px; font-weight: 500; }
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
+  font: 500 13px/1.2 var(--font-body); padding: 6px 11px; border-radius: 6px;
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--ink);
+}
+.btn:hover:not(:disabled) { border-color: var(--line-strong); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.primary { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.btn.danger { color: var(--drop); }
+.btn.danger.solid { background: var(--drop); border-color: var(--drop); color: var(--surface); }
+.btn.icon { width: 32px; padding: 6px 0; font-size: 16px; }
+.btn.sm { padding: 3px 9px; }
+.zoom { display: inline-flex; }
+.zoom .btn { border-radius: 0; margin-left: -1px; }
+.zoom .btn:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+.zoom .btn:last-child { border-radius: 0 6px 6px 0; }
+.save { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.save .sdot { width: 7px; height: 7px; border-radius: 50%; background: var(--avail); }
+.save.wait .sdot { background: var(--line-strong); }
+.save.err .sdot { background: var(--drop); }
+.save.err { color: var(--drop); }
+.save.ro .sdot { background: var(--muted); }
+.pm-wrap { position: relative; }
+.pop {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; width: min(290px, calc(100vw - 32px));
+  display: grid; gap: 10px; padding: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px var(--shadow);
+}
+.pop .inp { width: 100%; }
+.pm-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.pm-confirm p { margin: 0 0 8px; }
+
+/* ---------- canvas */
+.stage { position: relative; overflow: hidden; min-height: 0; }
+.viewport {
+  position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
+  background-color: var(--bg); background-image: radial-gradient(circle, var(--grid) 1px, transparent 1.3px); background-size: 24px 24px;
+}
+.viewport.panning { cursor: grabbing; }
+.world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.band { position: absolute; top: 0; background: transparent; border-left: 1px dashed var(--line); }
+.band.alt { background: var(--band); }
+.edges { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.e { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.e-open { stroke: var(--line-strong); }
+.e-done { stroke: var(--accent); }
+.e-faint { stroke: var(--line); stroke-dasharray: 4 5; }
+.e-path { stroke: var(--active); stroke-width: 3; }
+.e-next { stroke: var(--avail); stroke-width: 2.5; }
+.e-temp { stroke: var(--active); stroke-width: 2; stroke-dasharray: 6 4; }
+
+.node {
+  position: absolute; width: 236px; height: 84px; display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px 10px 10px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px;
+  box-shadow: 0 1px 2px var(--shadow); cursor: pointer; transition: box-shadow .15s ease;
+}
+.node:hover { box-shadow: 0 5px 16px var(--shadow); }
+.node:focus-visible { outline: 2px solid var(--active); outline-offset: 3px; }
+.node.sel { outline: 2px solid var(--ink); outline-offset: 3px; }
+.node.anc { box-shadow: 0 0 0 3px var(--active-soft); }
+.medal { flex: none; width: 40px; height: 40px; }
+.medal svg { display: block; width: 40px; height: 40px; }
+.nbody { min-width: 0; flex: 1; }
+.ntitle {
+  font-weight: 600; font-size: 13.5px; line-height: 1.25; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.nmeta { display: flex; align-items: center; gap: 7px; margin-top: 6px; font: 500 11px/1 var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.kind { font: 600 9.5px/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; padding: 3px 5px; border-radius: 4px; background: var(--surface-2); color: var(--muted); }
+.port {
+  position: absolute; right: -9px; top: 50%; width: 16px; height: 16px; margin-top: -8px; border-radius: 50%;
+  background: var(--surface); border: 2px solid var(--line-strong); cursor: crosshair; opacity: 0; transition: opacity .15s ease;
+}
+.port::after { content: ""; position: absolute; inset: -9px; }
+.node:hover .port, .node.sel .port { opacity: 1; }
+.port:hover { border-color: var(--active); background: var(--active-soft); }
+@media (hover: none) { .node:not(.sel) .port { display: none; } }
+.node.drop-ok { outline: 2px dashed var(--avail); outline-offset: 4px; }
+.node.drop-bad { outline: 2px dashed var(--drop); outline-offset: 4px; }
+
+.node.s-done { background: var(--done-bg); border-color: var(--accent); }
+.node.s-active { border-color: var(--active); border-width: 2px; box-shadow: 0 0 0 4px var(--active-soft); }
+.node.s-available { border-color: var(--avail); }
+.node.s-locked .ntitle { color: var(--muted); }
+.node.s-dropped { opacity: .58; }
+.node.s-dropped .ntitle { text-decoration: line-through; }
+.node.s-superseded, .node.s-blocked { opacity: .64; border-style: dashed; }
+
+.m-done { fill: var(--accent); }
+.m-check { stroke: var(--surface); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.m-track { stroke: var(--active-soft); stroke-width: 4; }
+.m-prog { stroke: var(--active); stroke-width: 4; stroke-linecap: round; }
+.m-pct { fill: var(--active); font: 600 10px var(--font-mono); text-anchor: middle; }
+.m-ring-avail { stroke: var(--avail); stroke-width: 2.5; }
+.m-dot-avail { fill: var(--avail); }
+.m-lockbg { fill: var(--surface-2); stroke: var(--line); stroke-width: 1.5; }
+.m-shackle { stroke: var(--muted); stroke-width: 2; }
+.m-lock { fill: var(--muted); }
+.m-ring-drop, .m-x { stroke: var(--drop); stroke-width: 2.2; stroke-linecap: round; }
+.m-ring-dash { stroke: var(--line-strong); stroke-width: 2; stroke-dasharray: 3 3.2; }
+.m-dash { stroke: var(--line-strong); stroke-width: 2.2; stroke-linecap: round; }
+.m-ring-cut { stroke: var(--drop); stroke-width: 2; stroke-dasharray: 3 3.2; }
+.m-cut { stroke: var(--drop); stroke-width: 2.2; stroke-linecap: round; }
+
+.orpill {
+  position: absolute; transform: translate(-50%, -50%); padding: 2px 6px; border-radius: 999px;
+  font: 600 10px/1.2 var(--font-mono); letter-spacing: .1em; color: var(--muted);
+  background: var(--bg); border: 1.5px solid var(--line-strong);
+}
+.tierbar { position: absolute; left: 0; right: 0; top: 0; height: 34px; z-index: 2; pointer-events: none; background: linear-gradient(var(--bg) 40%, transparent); }
+.tier { position: absolute; top: 9px; transform: translateX(-50%); white-space: nowrap; font: 13px/1 var(--font-display); letter-spacing: .16em; color: var(--muted); }
+
+/* ---------- frontier */
+.frontier {
+  position: absolute; z-index: 3; top: 40px; left: max(12px, env(safe-area-inset-left, 0px)); width: 268px; max-height: calc(100% - 52px);
+  display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 22px var(--shadow);
+}
+.fr-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; background: none; border: 0; text-align: left; border-radius: 10px; }
+.fr-name { font: 15px/1 var(--font-display); letter-spacing: .08em; }
+.fr-count { font: 600 11px/1 var(--font-mono); padding: 3px 6px; border-radius: 999px; background: var(--avail-soft); color: var(--avail); }
+.chev { width: 12px; height: 12px; margin-left: auto; transition: transform .15s ease; }
+.chev path { stroke: var(--muted); stroke-width: 1.6; }
+.fr-head[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.fr-body { overflow: auto; min-height: 0; padding: 0 12px 12px; display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; gap: 6px; }
+.fr-summary { display: grid; gap: 6px; padding-bottom: 4px; }
+.fr-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--surface-2); gap: 2px; }
+.fr-bar span { display: block; min-width: 4px; }
+.fr-stats { font-size: 12px; color: var(--muted); }
+.fr-h { margin: 8px 0 2px; font: 600 10.5px/1.3 var(--font-body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.fr-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; text-align: left; background: var(--surface-2); border: 1px solid transparent; border-radius: 7px; }
+.fr-item:hover { border-color: var(--line-strong); }
+.fr-t { flex: 1; min-width: 0; font-size: 13px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-m { font: 500 11px/1 var(--font-mono); color: var(--muted); }
+.fr-none { margin: 0; font-size: 12.5px; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.keys { margin: 4px 0 0; font-size: 11.5px; line-height: 1.6; color: var(--muted); }
+kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; background: var(--surface-2); color: var(--ink); }
+
+.dot { display: inline-block; flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); }
+.dot.s-done, .fr-bar .seg-done { background: var(--accent); }
+.dot.s-active, .fr-bar .seg-active { background: var(--active); }
+.dot.s-available, .fr-bar .seg-available { background: var(--avail); }
+.dot.s-locked, .fr-bar .seg-locked { background: var(--line-strong); }
+.dot.s-dropped, .fr-bar .seg-dropped { background: var(--drop); }
+.dot.s-superseded, .fr-bar .seg-superseded { background: transparent; border: 1.5px dashed var(--line-strong); }
+.dot.s-blocked, .fr-bar .seg-blocked { background: transparent; border: 1.5px dashed var(--drop); }
+
+/* ---------- inspector */
+.inspector {
+  position: absolute; z-index: 4; top: 12px; bottom: 12px; right: max(12px, env(safe-area-inset-right, 0px)); width: 348px;
+  overflow: auto; display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; align-content: start; gap: 14px; padding: 16px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 34px var(--shadow);
+}
+.i-top { display: flex; align-items: center; gap: 8px; }
+.i-tier { font: 12px/1 var(--font-display); letter-spacing: .14em; color: var(--muted); }
+.icon-btn { margin-left: auto; width: 30px; height: 30px; border-radius: 6px; border: 1px solid transparent; background: none; font-size: 20px; line-height: 1; color: var(--muted); }
+.icon-btn:hover { border-color: var(--line); color: var(--ink); }
+.pill { font: 600 10.5px/1 var(--font-body); text-transform: uppercase; letter-spacing: .09em; padding: 5px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.pill.s-done { background: var(--accent-soft); color: var(--accent); }
+.pill.s-active { background: var(--active-soft); color: var(--active); }
+.pill.s-available { background: var(--avail-soft); color: var(--avail); }
+.pill.s-dropped, .pill.s-blocked { background: var(--drop-soft); color: var(--drop); }
+.i-title {
+  width: 100%; resize: none; padding: 6px 8px; margin: -4px 0 0 -8px; width: calc(100% + 16px);
+  font: 600 18px/1.3 var(--font-body); border: 1px solid transparent; border-radius: 6px; background: transparent; text-wrap: balance;
+  field-sizing: content; min-height: 2.2em;
+}
+.i-title:hover:not(:disabled) { border-color: var(--line); }
+.i-title:focus { border-color: var(--active); background: var(--surface-2); outline: none; }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { padding: 7px 2px; border: 0; border-left: 1px solid var(--line); background: var(--surface-2); font-size: 12px; font-weight: 500; color: var(--muted); }
+.seg button:first-child { border-left: 0; }
+.seg button.on { background: var(--ink); color: var(--surface); }
+.seg button[data-status="done"].on { background: var(--accent); }
+.seg button[data-status="active"].on { background: var(--active); }
+.seg button[data-status="dropped"].on { background: var(--drop); }
+.seg button:disabled { cursor: default; }
+.why { margin: -4px 0 0; font-size: 13px; color: var(--muted); }
+.field { display: grid; gap: 6px; margin: 0; min-width: 0; }
+.field textarea {
+  width: 100%; resize: vertical; padding: 8px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); line-height: 1.45;
+}
+.field textarea:focus, .field select:focus, .field input:focus, .inp:focus, .addsel:focus { border-color: var(--active); outline: none; }
+.field input[type="range"] { width: 100%; accent-color: var(--active); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row2 .field select, .row2 .field input { width: 100%; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 3px 3px 3px 8px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); }
+.chip-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0; border: 0; background: none; font-size: 12.5px; text-align: left; }
+.chip-t:hover { text-decoration: underline; }
+.chip-x { width: 20px; height: 20px; border: 0; border-radius: 4px; background: none; color: var(--muted); font-size: 15px; line-height: 1; }
+.chip-x:hover { background: var(--drop-soft); color: var(--drop); }
+.chip:not(:has(.chip-x)) { padding-right: 8px; }
+.none { margin: 0; font-size: 12.5px; color: var(--muted); }
+.addsel { justify-self: start; max-width: 100%; font-size: 12.5px; color: var(--muted); }
+.pathbox { display: grid; gap: 4px; padding: 10px 12px; border-radius: 8px; background: var(--active-soft); }
+.pathbox p { margin: 0; font-size: 13px; }
+.pathbox .hint, .hint { font-size: 12px; color: var(--muted); }
+.warn { color: var(--drop); }
+.i-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.i-acts2 { display: flex; align-items: center; gap: 6px; }
+.grow { flex: 1; }
+.i-meta { margin: 0; font: 11px/1.4 var(--font-mono); color: var(--muted); }
+
+/* ---------- empty state, toast, modal */
+.empty { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); pointer-events: none; }
+.empty-card { pointer-events: auto; width: min(460px, 100%); display: grid; gap: 12px; padding: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px var(--shadow); }
+.empty-card h2 { margin: 0; font: 22px/1.2 var(--font-display); letter-spacing: .04em; text-wrap: balance; }
+.empty-card p { margin: 0; color: var(--muted); }
+.e-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.toast {
+  position: fixed; z-index: 40; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px); padding: 10px 14px; border-radius: 9px;
+  background: var(--ink); color: var(--surface); font-size: 13px; box-shadow: 0 8px 24px var(--shadow);
+}
+.toast button { padding: 4px 10px; border-radius: 6px; border: 1px solid currentColor; background: none; color: inherit; font-weight: 600; font-size: 12.5px; }
+.modal-back { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: var(--scrim); }
+.modal { width: min(660px, 100%); max-height: 100%; overflow: auto; display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; gap: 12px; padding: 18px; background: var(--surface); border-radius: 12px; border: 1px solid var(--line); }
+.m-head { display: flex; align-items: center; }
+.m-head h2 { margin: 0; font: 20px/1.2 var(--font-display); letter-spacing: .05em; }
+.modal p { margin: 0; color: var(--muted); }
+.modal textarea { width: 100%; min-height: 220px; resize: vertical; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); font: 12px/1.5 var(--font-mono); }
+.m-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.tabs button { padding: 7px 12px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); font-weight: 500; }
+.tabs button.on { color: var(--ink); border-bottom-color: var(--ink); }
+.mini-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.mini-seg button { padding: 5px 10px; border: 0; background: var(--surface-2); font-size: 12.5px; color: var(--muted); }
+.mini-seg button.on { background: var(--ink); color: var(--surface); }
+
+.ro .edit-only { display: none !important; }
+
+@media (max-width: 720px) {
+  .brand .b-name, .wide-only { display: none; }
+  .proj { order: 1; flex: 1 1 0; }
+  .save { order: 2; margin-left: 0; }
+  .save:not(.err) .stxt { display: none; }
+  .tools { order: 3; flex-basis: 100%; }
+  .frontier { width: auto; right: max(12px, env(safe-area-inset-right, 0px)); max-height: 55%; }
+  .inspector {
+    left: 0; right: 0; bottom: 0; top: auto; width: auto; max-height: 64%; border-radius: 14px 14px 0 0; border-bottom: 0;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="bar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path class="b-line" d="M6 12h4M10 12V6.5h4.5M10 12v5.5h4.5"/>
+        <circle class="b-done" cx="5" cy="12" r="3.2"/>
+        <circle class="b-av" cx="18" cy="6.5" r="3"/>
+        <circle class="b-lk" cx="18" cy="17.5" r="3"/>
+      </svg>
+      <span class="b-name">Research Tech Tree</span>
+    </div>
+    <div class="proj">
+      <label class="sr" for="projSel">Research project</label>
+      <select id="projSel" class="sel"></select>
+      <div class="pm-wrap">
+        <button class="btn icon" id="projMenuBtn" aria-haspopup="true" aria-expanded="false" aria-label="Tree options" title="Rename, add or delete trees">&#8943;</button>
+        <div id="projPop" class="pop" hidden></div>
+      </div>
+    </div>
+    <div class="tools">
+      <button class="btn primary edit-only" id="addBtn" title="Add an idea (N)">+ Idea</button>
+      <button class="btn edit-only" id="undoBtn" title="Undo (Ctrl+Z / &#8984;Z)">Undo</button>
+      <div class="zoom">
+        <button class="btn icon" id="zOut" aria-label="Zoom out">&minus;</button>
+        <button class="btn" id="zFit" title="Fit the tree to the screen (F)">Fit</button>
+        <button class="btn icon" id="zIn" aria-label="Zoom in">+</button>
+      </div>
+      <button class="btn" id="dataBtn">Export<span class="wide-only"> / Import</span></button>
+    </div>
+    <div class="save wait" id="saveState" role="status"><span class="sdot"></span><span class="stxt">Connecting…</span></div>
+  </header>
+  <main class="stage" id="stage">
+    <div class="viewport" id="viewport">
+      <div class="world" id="world">
+        <div id="bands"></div>
+        <svg id="edges" class="edges" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div id="nodes"></div>
+      </div>
+    </div>
+    <div class="tierbar" id="tierbar" aria-hidden="true"></div>
+    <aside class="frontier" id="frontier" aria-label="Frontier" hidden></aside>
+    <aside class="inspector" id="insp" aria-label="Idea details" hidden></aside>
+    <div class="empty" id="empty" hidden></div>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<div class="modal-back" id="dataModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dmTitle">
+    <div class="m-head"><h2 id="dmTitle">Export / Import</h2><button class="icon-btn" data-close aria-label="Close">&times;</button></div>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="export" class="on" aria-selected="true">Export</button>
+      <button role="tab" data-tab="import" class="edit-only" aria-selected="false">Import</button>
+    </div>
+    <section data-pane="export" class="field">
+      <p>JSON is a full backup; paste it into Import here or in another copy of this page. The outline is Markdown for notes or an email to a coauthor.</p>
+      <div class="m-row">
+        <div class="mini-seg" role="group" aria-label="Format"><button data-fmt="json" class="on">JSON</button><button data-fmt="md">Outline</button></div>
+        <label class="sr" for="exScope">Which trees</label>
+        <select id="exScope" class="sel"><option value="cur">This tree</option><option value="all">All trees</option></select>
+      </div>
+      <label class="sr" for="exText">Exported text</label>
+      <textarea id="exText" readonly spellcheck="false"></textarea>
+      <div class="m-row"><button class="btn primary" id="exCopy">Copy</button><button class="btn" id="exDl" hidden>Download file</button></div>
+    </section>
+    <section data-pane="import" class="field" hidden>
+      <p>Paste JSON exported from this tracker, or choose a .json file. Imported trees are added next to your current ones; nothing is overwritten.</p>
+      <label class="sr" for="imText">JSON to import</label>
+      <textarea id="imText" spellcheck="false" placeholder='{"format": "research-tech-tree", "projects": [ … ]}'></textarea>
+      <div class="m-row">
+        <label class="btn" for="imFile">Choose file…</label><input type="file" id="imFile" accept=".json,application/json" class="sr">
+        <button class="btn primary" id="imGo">Import</button>
+      </div>
+      <p id="imMsg" class="hint" role="status"></p>
+    </section>
+  </div>
+</div>
+<script>
+(() => {
+'use strict';
+
+// ---------- constants
+const W = 236, H = 84, GAP = 64, COLW = W + GAP, ROWH = 104, PADX = 56, PADY = 52;
+const KMIN = 0.3, KMAX = 1.8;
+const STATUSES = ['todo', 'active', 'done', 'dropped'];
+const STATUS_LABEL = { todo: 'Not started', active: 'Researching', done: 'Done', dropped: 'Dropped' };
+const DS_LABEL = { done: 'Done', active: 'Researching', available: 'Available', locked: 'Locked', superseded: 'Superseded', blocked: 'Cut off', dropped: 'Dropped' };
+const DS_ORDER = ['done', 'active', 'available', 'locked', 'superseded', 'blocked', 'dropped'];
+const KINDS = ['Model', 'Calibration', 'Data', 'Estimation', 'Robustness', 'Writing', 'Other'];
+const DATA_KEY = 'research-tech-tree:data:v1';
+const PREF_KEY = 'research-tech-tree:prefs:v1';
+const SVGNS = 'http://www.w3.org/2000/svg';
+const reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+const $ = id => document.getElementById(id);
+const el = {
+  app: $('app'), stage: $('stage'), viewport: $('viewport'), world: $('world'), bands: $('bands'), edges: $('edges'), nodes: $('nodes'),
+  tierbar: $('tierbar'), frontier: $('frontier'), insp: $('insp'), empty: $('empty'), projSel: $('projSel'), projMenuBtn: $('projMenuBtn'),
+  projPop: $('projPop'), addBtn: $('addBtn'), undoBtn: $('undoBtn'), zIn: $('zIn'), zOut: $('zOut'), zFit: $('zFit'), dataBtn: $('dataBtn'),
+  save: $('saveState'), toast: $('toast'), modal: $('dataModal'),
+};
+
+const state = { projects: {}, pid: null, sel: null, mode: 'loading', loaded: false, readOnly: false, storageOK: true, saveError: false };
+let view = { x: 0, y: 0, k: 1 };
+let L = null;   // layout of the current tree
+let D = {};     // derived state per idea
+let DB = null;  // artifact store, when available
+
+// ---------- small helpers
+const uid = pre => pre + Math.random().toString(36).slice(2, 9);
+const nowISO = () => new Date().toISOString();
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const trunc = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+const uniq = a => [...new Set(a)];
+const fmtEff = d => (Math.round(d * 10) / 10) + 'd';
+const fmtDate = iso => (iso ? String(iso).slice(0, 10) : '');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function roman(n) {
+  let s = '';
+  for (const [v, r] of [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']]) while (n >= v) { s += r; n -= v; }
+  return s;
+}
+function stable(v) {
+  if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
+  if (v && typeof v === 'object') return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
+  return JSON.stringify(v === undefined ? null : v);
+}
+
+// ---------- per-viewer preferences (remembered tree, panel, camera)
+const prefs = (() => { try { return JSON.parse(localStorage.getItem(PREF_KEY)) || {}; } catch (e) { return {}; } })();
+if (!prefs.views || typeof prefs.views !== 'object') prefs.views = {};
+let prefT = 0;
+function savePrefs() {
+  clearTimeout(prefT);
+  prefT = setTimeout(() => { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch (e) { /* storage off */ } }, 300);
+}
+const frontierOpen = () => (typeof prefs.frontierOpen === 'boolean' ? prefs.frontierOpen : window.innerWidth > 720);
+function rememberView() { if (state.pid) { prefs.views[state.pid] = { x: Math.round(view.x), y: Math.round(view.y), k: +view.k.toFixed(3) }; savePrefs(); } }
+
+// ---------- data model
+function normNode(id, r, i) {
+  r = r && typeof r === 'object' ? r : {};
+  const t = nowISO();
+  const eff = r.effort === '' || r.effort == null ? null : Number(r.effort);
+  return {
+    id,
+    title: typeof r.title === 'string' ? r.title : 'Untitled idea',
+    notes: typeof r.notes === 'string' ? r.notes : '',
+    findings: typeof r.findings === 'string' ? r.findings : '',
+    status: STATUSES.includes(r.status) ? r.status : 'todo',
+    kind: KINDS.includes(r.kind) ? r.kind : 'Other',
+    effort: Number.isFinite(eff) && eff >= 0 ? eff : null,
+    progress: clamp(Math.round(Number(r.progress) || 0), 0, 100),
+    prereqs: Array.isArray(r.prereqs) ? r.prereqs.filter(x => typeof x === 'string') : [],
+    alts: Array.isArray(r.alts) ? r.alts.filter(x => typeof x === 'string') : [],
+    seq: Number.isFinite(Number(r.seq)) && r.seq !== null && r.seq !== '' ? Number(r.seq) : i,
+    created: typeof r.created === 'string' ? r.created : t,
+    updated: typeof r.updated === 'string' ? r.updated : t,
+  };
+}
+function normProject(id, r) {
+  r = r && typeof r === 'object' ? r : {};
+  const t = nowISO();
+  const raw = r.nodes;
+  const entries = Array.isArray(raw)
+    ? raw.map(n => [n && typeof n.id === 'string' && n.id ? n.id : uid('n'), n])
+    : Object.entries(raw && typeof raw === 'object' ? raw : {});
+  const nodes = {};
+  entries.forEach(([nid, n], i) => { nodes[nid] = normNode(nid, n, i); });
+  const list = Object.values(nodes);
+  for (const n of list) {
+    n.prereqs = uniq(n.prereqs.filter(q => q !== n.id && nodes[q]));
+    n.alts = uniq(n.alts.filter(a => a !== n.id && nodes[a]));
+  }
+  // Prerequisites must form a DAG: drop any link that closes a loop.
+  const color = {};
+  const visit = id => {
+    color[id] = 1;
+    const n = nodes[id];
+    n.prereqs = n.prereqs.filter(q => { if (color[q] === 1) return false; if (!color[q]) visit(q); return true; });
+    color[id] = 2;
+  };
+  Object.keys(nodes).forEach(id => { if (!color[id]) visit(id); });
+  // Alternatives are kept as cliques: everyone in a group is an alternative to everyone else.
+  const g = altGroupsOf(nodes), groups = {};
+  for (const id in g) (groups[g[id]] = groups[g[id]] || []).push(id);
+  for (const id in nodes) nodes[id].alts = groups[g[id]].filter(x => x !== id).sort((a, b) => nodes[a].seq - nodes[b].seq || (a < b ? -1 : 1));
+  return {
+    id,
+    name: typeof r.name === 'string' && r.name.trim() ? r.name : 'Untitled tree',
+    created: typeof r.created === 'string' ? r.created : t,
+    updated: typeof r.updated === 'string' ? r.updated : t,
+    order: Number(r.order) || 0,
+    nodes,
+  };
+}
+function toBody(p) {
+  const nodes = {};
+  for (const n of Object.values(p.nodes)) { const { id, ...rest } = n; nodes[id] = rest; }
+  return { name: p.name, created: p.created, updated: p.updated, order: p.order, nodes };
+}
+function altGroupsOf(nodes) {
+  const par = {};
+  const find = x => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+  for (const id in nodes) par[id] = id;
+  for (const id in nodes) for (const a of nodes[id].alts) if (nodes[a]) par[find(a)] = find(id);
+  const g = {};
+  for (const id in nodes) g[id] = find(id);
+  return g;
+}
+const cur = () => state.projects[state.pid] || null;
+const sortedNodes = p => Object.values(p.nodes).sort((a, b) => (a.seq - b.seq) || String(a.created).localeCompare(String(b.created)));
+const projectList = () => Object.values(state.projects).sort((a, b) => (a.order - b.order) || String(a.created).localeCompare(String(b.created)));
+function ancestors(p, id) {
+  const out = new Set(), stack = [...(p.nodes[id] ? p.nodes[id].prereqs : [])];
+  while (stack.length) {
+    const q = stack.pop();
+    if (out.has(q) || !p.nodes[q]) continue;
+    out.add(q);
+    stack.push(...p.nodes[q].prereqs);
+  }
+  return out;
+}
+const dependsOn = (p, x, y) => x === y || ancestors(p, x).has(y);   // x needs y, directly or through other ideas
+
+function computeDerived(p) {
+  const N = p.nodes, out = {};
+  const ds = id => {
+    if (out[id]) return out[id];
+    out[id] = 'locked';
+    const n = N[id];
+    let s;
+    if (n.status === 'done') s = 'done';
+    else if (n.status === 'dropped') s = 'dropped';
+    else if (n.status === 'active') s = 'active';
+    else if (n.alts.some(a => N[a] && N[a].status === 'done')) s = 'superseded';
+    else {
+      const pre = n.prereqs.filter(q => N[q]);
+      const st = pre.map(ds);
+      if (st.some(x => x === 'dropped' || x === 'blocked' || x === 'superseded')) s = 'blocked';
+      else if (pre.every(q => N[q].status === 'done')) s = 'available';
+      else s = 'locked';
+    }
+    return (out[id] = s);
+  };
+  for (const id in N) ds(id);
+  return out;
+}
+
+// Tiers are prerequisite depth. Each idea hangs under its deepest prerequisite, so the
+// tree reads left to right; leaves take one row each and parents sit centred on their subtree.
+function computeLayout(p) {
+  const N = p.nodes, nodes = sortedNodes(p);
+  const depth = {}, onstack = new Set();
+  const dep = id => {
+    if (depth[id] != null) return depth[id];
+    if (onstack.has(id)) return 0;
+    onstack.add(id);
+    let m = -1;
+    for (const q of N[id].prereqs) if (N[q]) m = Math.max(m, dep(q));
+    onstack.delete(id);
+    return (depth[id] = m + 1);
+  };
+  nodes.forEach(n => dep(n.id));
+  const group = altGroupsOf(N);
+  const parent = {}, kids = {}, children = {}, roots = [];
+  for (const n of nodes) {
+    let par = null;
+    for (const q of n.prereqs) {
+      if (!N[q]) continue;
+      (children[q] = children[q] || []).push(n.id);
+      if (!par && depth[q] === depth[n.id] - 1) par = q;
+    }
+    parent[n.id] = par;
+    if (par) (kids[par] = kids[par] || []).push(n.id); else roots.push(n.id);
+  }
+  const orderSibs = ids => {
+    const key = {};
+    for (const id of ids) if (key[group[id]] == null) key[group[id]] = N[id].seq;
+    return ids.slice().sort((a, b) => (key[group[a]] - key[group[b]]) || (N[a].seq - N[b].seq));
+  };
+  for (const k in kids) kids[k] = orderSibs(kids[k]);
+  const rootList = orderSibs(roots);
+  const slot = {};
+  let s = 0;
+  const place = id => {
+    const ch = kids[id] || [];
+    if (!ch.length) { slot[id] = s; s += 1; return [slot[id], slot[id]]; }
+    let lo = Infinity, hi = -Infinity;
+    for (const c of ch) { const [a, b] = place(c); lo = Math.min(lo, a); hi = Math.max(hi, b); }
+    slot[id] = (lo + hi) / 2;
+    return [lo, hi];
+  };
+  rootList.forEach((r, i) => { if (i) s += 0.35; place(r); });
+  let maxDepth = 0, maxSlot = 0;
+  const pos = {};
+  for (const n of nodes) {
+    const d = depth[n.id];
+    maxDepth = Math.max(maxDepth, d);
+    maxSlot = Math.max(maxSlot, slot[n.id]);
+    pos[n.id] = { x: PADX + d * COLW, y: PADY + slot[n.id] * ROWH, d };
+  }
+  return {
+    pos, parent, kids, children, roots: rootList, group, maxDepth,
+    width: PADX * 2 + (maxDepth + 1) * COLW - GAP,
+    height: PADY * 2 + maxSlot * ROWH + H,
+  };
+}
+
+// ---------- the example tree (opened the first time the local file runs)
+function exampleProject() {
+  const t = nowISO();
+  const mk = (seq, o) => Object.assign({ notes: '', findings: '', status: 'todo', kind: 'Other', effort: null, progress: 0, prereqs: [], alts: [], seq, created: t, updated: t }, o);
+  return normProject('hkt', {
+    name: 'Two-country HKT calibration', created: t, updated: t, order: 0,
+    nodes: {
+      base: mk(0, { title: 'Two-country HKT model calibration', kind: 'Calibration', status: 'done', notes: 'Current model and baseline calibration. The ideas to the right revise it.' }),
+      altprod: mk(1, { title: 'Consider an alternative production model', kind: 'Model', prereqs: ['base'], alts: ['keep'], notes: 'Replace the production side of the model instead of patching the current calibration.' }),
+      keep: mk(2, { title: 'Keep the existing model', kind: 'Model', prereqs: ['base'], alts: ['altprod'], notes: 'Accept the current production structure and fix the calibration within it.' }),
+      wage: mk(3, { title: 'Check the 23–24 wage premium', kind: 'Data', prereqs: ['keep'], notes: 'Look into the 23–24 wage premium problem.' }),
+      reorder: mk(4, { title: 'Reorder the calibration', kind: 'Calibration', prereqs: ['keep'], notes: 'Calibrate the markup internally; discipline the R&D labor share externally.' }),
+    },
+  });
+}
+
+// ---------- saving
+const saveTimers = {}, inflight = {}, again = {}, lastWritten = {};
+const isPending = pid => !!(saveTimers[pid] || inflight[pid]);
+function scheduleSave(pid, delay = 0) {
+  if (state.readOnly || !state.loaded) return;
+  clearTimeout(saveTimers[pid]);
+  saveTimers[pid] = setTimeout(() => { delete saveTimers[pid]; flush(pid); }, delay);
+  updateSave();
+}
+async function withRetry(fn) {
+  try { return await fn(); }
+  catch (e) {
+    if (e && e.code === 'unavailable') { await sleep(400 + Math.random() * 800); return fn(); }
+    throw e;
+  }
+}
+async function flush(pid) {
+  if (inflight[pid]) { again[pid] = true; return; }
+  inflight[pid] = true;
+  updateSave();
+  try {
+    const p = state.projects[pid];
+    if (state.mode === 'db') {
+      if (p) {
+        const body = toBody(normProject(pid, toBody(p)));
+        lastWritten[pid] = stable(body);
+        await withRetry(() => DB.doc('projects/' + pid).set(body));
+      } else {
+        delete lastWritten[pid];
+        await withRetry(() => DB.doc('projects/' + pid).delete());
+      }
+    } else {
+      state.storageOK = writeLocal();
+    }
+    state.saveError = false;
+  } catch (e) {
+    onSaveError(e);
+  } finally {
+    inflight[pid] = false;
+    if (again[pid]) { again[pid] = false; flush(pid); }
+    updateSave();
+  }
+}
+function onSaveError(e) {
+  const code = e && e.code;
+  if (code === 'invalid_argument' || code === 'revoked' || code === 'not_granted') {
+    setReadOnly(true);
+    toast('You can view this tree but not change it. Your last edit was not saved.');
+  } else if (code === 'quota_exceeded') {
+    state.saveError = true;
+    toast('Storage is full. Export and delete an old tree, then edit again to save.');
+  } else {
+    state.saveError = true;
+    toast('Could not save. Your changes stay on this page and will save with your next edit.');
+  }
+}
+function writeLocal() {
+  try {
+    const out = {};
+    for (const id in state.projects) out[id] = toBody(state.projects[id]);
+    localStorage.setItem(DATA_KEY, JSON.stringify({ format: 'research-tech-tree', version: 1, projects: out }));
+    return true;
+  } catch (e) { return false; }
+}
+function updateSave() {
+  const pending = Object.keys(saveTimers).length > 0 || Object.values(inflight).some(Boolean);
+  let cls = 'ok', txt;
+  if (!state.loaded) { cls = 'wait'; txt = 'Connecting…'; }
+  else if (state.mode === 'local') {
+    if (!state.storageOK) { cls = 'err'; txt = 'Not saved: browser storage is off'; }
+    else txt = pending ? 'Saving…' : 'Saved in this browser';
+  }
+  else if (state.readOnly) { cls = 'ro'; txt = 'View only'; }
+  else if (state.saveError) { cls = 'err'; txt = 'Not saved'; }
+  else { txt = pending ? 'Saving…' : 'Saved'; if (pending) cls = 'wait'; }
+  el.save.className = 'save ' + cls;
+  el.save.querySelector('.stxt').textContent = txt;
+  el.save.title = state.mode === 'local'
+    ? 'This copy lives in this browser only. Use Export to back it up or move it.'
+    : state.mode === 'db' ? 'Saved with this artifact and available wherever you open it.' : '';
+}
+function setReadOnly(v) {
+  state.readOnly = v;
+  el.app.classList.toggle('ro', v);
+  el.modal.classList.toggle('ro', v);
+  render();
+  renderInspector();
+}
+
+// ---------- editing
+const undoStacks = {};
+let lastCo = null;
+function mutate(fn, { co = null, delay = 0, insp = false } = {}) {
+  const p = cur();
+  if (!p || state.readOnly) return;
+  if (!co || co !== lastCo) {
+    const st = (undoStacks[p.id] = undoStacks[p.id] || []);
+    st.push(JSON.stringify(toBody(p)));
+    if (st.length > 80) st.shift();
+  }
+  lastCo = co;
+  fn(p);
+  p.updated = nowISO();
+  scheduleSave(p.id, delay);
+  render();
+  if (insp) renderInspector();
+}
+function undo() {
+  const p = cur();
+  if (!p || state.readOnly) return;
+  const st = undoStacks[p.id];
+  if (!st || !st.length) { toast('Nothing to undo'); return; }
+  const prev = normProject(p.id, JSON.parse(st.pop()));
+  prev.updated = nowISO();
+  state.projects[p.id] = prev;
+  lastCo = null;
+  if (state.sel && !prev.nodes[state.sel]) state.sel = null;
+  scheduleSave(p.id);
+  render();
+  renderInspector();
+}
+function makeNode(props) {
+  const t = nowISO();
+  return normNode(uid('n'), Object.assign({ title: 'New idea', status: 'todo', kind: 'Other', created: t, updated: t }, props), 0);
+}
+function insertNode(p, n, afterId) {
+  const arr = sortedNodes(p).filter(x => x.id !== n.id);
+  const idx = afterId ? arr.findIndex(x => x.id === afterId) : arr.length - 1;
+  arr.splice(idx + 1, 0, n);
+  arr.forEach((x, i) => { x.seq = i; });
+  p.nodes[n.id] = n;
+}
+function removeFromGroup(p, id) {
+  const n = p.nodes[id];
+  if (!n) return;
+  for (const a of n.alts) if (p.nodes[a]) p.nodes[a].alts = p.nodes[a].alts.filter(x => x !== id);
+  n.alts = [];
+}
+function addIdea(kind) {
+  const p = cur();
+  if (!p || state.readOnly) return;
+  const base = state.sel ? p.nodes[state.sel] : null;
+  if (!base) kind = 'root';
+  let newId = null;
+  mutate(p => {
+    const props = { kind: base ? base.kind : 'Other' };
+    if (kind === 'follow') props.prereqs = [base.id];
+    else if (kind === 'parallel' || kind === 'alt') props.prereqs = base.prereqs.slice();
+    const n = makeNode(props);
+    insertNode(p, n, kind === 'parallel' || kind === 'alt' ? base.id : null);
+    if (kind === 'alt') {
+      const grp = [base.id, ...base.alts];
+      n.alts = grp.slice();
+      grp.forEach(g => { p.nodes[g].alts = uniq([...p.nodes[g].alts, n.id]); });
+    }
+    newId = n.id;
+  });
+  if (newId) select(newId, { center: true, focus: true });
+}
+function deleteNode(id) {
+  const p = cur();
+  const n = p && p.nodes[id];
+  if (!n || state.readOnly) return;
+  mutate(p => {
+    for (const m of Object.values(p.nodes)) {
+      if (m.id === id) continue;
+      // Follow-ups inherit the deleted idea's prerequisites, so the chain stays connected.
+      if (m.prereqs.includes(id)) m.prereqs = uniq(m.prereqs.filter(x => x !== id).concat(n.prereqs)).filter(x => x !== m.id);
+      m.alts = m.alts.filter(x => x !== id);
+    }
+    delete p.nodes[id];
+  });
+  if (state.sel === id) { state.sel = null; render(); renderInspector(); }
+  toast(`Deleted “${trunc(n.title, 40)}”`, { action: 'Undo', onAction: undo });
+}
+function setStatus(id, s) {
+  const p = cur();
+  if (!p || !p.nodes[id] || p.nodes[id].status === s) return;
+  const before = new Set(Object.keys(D).filter(k => D[k] === 'available'));
+  mutate(p => { const n = p.nodes[id]; n.status = s; n.updated = nowISO(); }, { insp: true });
+  const opened = Object.keys(D).filter(k => D[k] === 'available' && !before.has(k) && k !== id);
+  if (s === 'done' && opened.length) {
+    const names = opened.map(k => `“${trunc(cur().nodes[k].title, 32)}”`);
+    toast(`Unlocked ${names.slice(0, 3).join(', ')}${names.length > 3 ? ` and ${names.length - 3} more` : ''}`);
+  }
+}
+function linkPrereq(targetId, fromId) {
+  const p = cur();
+  if (!p || state.readOnly) return;
+  const t = p.nodes[targetId], f = p.nodes[fromId];
+  if (!t || !f || targetId === fromId) { render(); return; }
+  if (t.prereqs.includes(fromId)) { toast('Those two are already linked.'); render(); return; }
+  if (dependsOn(p, fromId, targetId)) {
+    toast(`That would make a loop: “${trunc(f.title, 30)}” already depends on “${trunc(t.title, 30)}”.`);
+    render();
+    return;
+  }
+  mutate(p => {
+    const tt = p.nodes[targetId];
+    tt.prereqs = [...tt.prereqs, fromId];
+    if (tt.alts.includes(fromId)) removeFromGroup(p, targetId);
+  }, { insp: !!state.sel });
+  toast(`“${trunc(t.title, 32)}” now requires “${trunc(f.title, 32)}”`);
+}
+function addAlt(nId, mId) {
+  const p = cur();
+  if (!p || state.readOnly || nId === mId) return;
+  if (dependsOn(p, nId, mId) || dependsOn(p, mId, nId)) { toast('An idea cannot be an alternative to its own prerequisite or follow-up.'); renderInspector(); return; }
+  mutate(p => {
+    const g = uniq([nId, ...p.nodes[nId].alts, mId, ...p.nodes[mId].alts]);
+    g.forEach(x => { p.nodes[x].alts = g.filter(y => y !== x); });
+  }, { insp: true });
+}
+function move(id, dir) {
+  const p = cur();
+  if (!p || !L) return;
+  const par = L.parent[id];
+  const sibs = par ? L.kids[par] : L.roots;
+  const i = sibs.indexOf(id), j = i + dir;
+  if (i < 0 || j < 0 || j >= sibs.length) return;
+  mutate(p => { const a = p.nodes[id], b = p.nodes[sibs[j]]; const t = a.seq; a.seq = b.seq; b.seq = t; });
+}
+
+// ---------- projects
+function openProject(pid, { fresh = false } = {}) {
+  state.pid = pid && state.projects[pid] ? pid : (projectList()[0] ? projectList()[0].id : null);
+  state.sel = null;
+  lastCo = null;
+  prefs.pid = state.pid;
+  savePrefs();
+  render();
+  renderInspector();
+  const v = state.pid && prefs.views[state.pid];
+  if (v && !fresh && Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.k)) { view = { x: v.x, y: v.y, k: clamp(v.k, KMIN, KMAX) }; applyView(); }
+  else fit(false);
+}
+function nextOrder() { return Math.max(-1, ...Object.values(state.projects).map(p => p.order || 0)) + 1; }
+function newProject() {
+  if (state.readOnly) return;
+  const t = nowISO(), id = uid('p');
+  const root = makeNode({ title: 'Research question' });
+  root.seq = 0;
+  state.projects[id] = { id, name: 'Untitled tree', created: t, updated: t, order: nextOrder(), nodes: { [root.id]: root } };
+  scheduleSave(id);
+  openProject(id, { fresh: true });
+  select(root.id);
+  openPop(true);
+}
+function deleteProject() {
+  const p = cur();
+  if (!p || state.readOnly) return;
+  const copy = JSON.parse(JSON.stringify(p));
+  delete state.projects[p.id];
+  scheduleSave(p.id);
+  closePop();
+  openProject(null);
+  toast(`Deleted tree “${trunc(p.name, 40)}”`, {
+    action: 'Undo',
+    onAction: () => { state.projects[copy.id] = copy; scheduleSave(copy.id); openProject(copy.id); },
+  });
+}
+
+// ---------- rendering
+function render() {
+  renderHeader();
+  updateSave();
+  el.app.classList.toggle('ro', state.readOnly);
+  const p = cur();
+  if (!state.loaded || !p) {
+    L = null; D = {};
+    el.bands.innerHTML = ''; el.edges.innerHTML = ''; el.nodes.innerHTML = ''; el.tierbar.innerHTML = '';
+    el.frontier.hidden = true;
+    showEmpty(state.loaded ? 'none' : 'loading');
+    return;
+  }
+  el.empty.hidden = true;
+  L = computeLayout(p);
+  D = computeDerived(p);
+  renderWorld(p);
+  renderTierBar();
+  renderFrontier();
+}
+let projKey = '';
+function renderHeader() {
+  const ps = projectList();
+  const key = ps.map(p => p.id + '\u0001' + p.name).join('\u0002') + '|' + state.pid;
+  if (key !== projKey) {
+    projKey = key;
+    el.projSel.innerHTML = ps.length ? ps.map(p => `<option value="${esc(p.id)}">${esc(trunc(p.name, 70))}</option>`).join('') : '<option value="">No trees yet</option>';
+    el.projSel.value = state.pid || '';
+  }
+  el.projSel.disabled = !ps.length;
+  el.projMenuBtn.disabled = !cur();
+  el.addBtn.disabled = !cur();
+  el.addBtn.textContent = state.sel ? '+ Follow-up' : '+ Idea';
+  el.addBtn.title = state.sel ? 'Add an idea that builds on the selected one (N)' : 'Add a new starting idea (N)';
+  el.undoBtn.disabled = !(undoStacks[state.pid] && undoStacks[state.pid].length);
+  el.zIn.disabled = el.zOut.disabled = el.zFit.disabled = !cur();
+}
+function showEmpty(kind) {
+  el.empty.hidden = false;
+  if (kind === 'loading') { el.empty.innerHTML = '<div class="empty-card"><p>Opening your trees…</p></div>'; return; }
+  const acts = state.readOnly ? '' : `<div class="e-acts"><button class="btn primary" data-empty="new">Start a tree</button>${state.mode === 'local' ? '<button class="btn" data-empty="example">Load the HKT example</button>' : ''}<button class="btn" data-empty="import">Import JSON</button></div>`;
+  el.empty.innerHTML = `<div class="empty-card"><h2>No trees yet</h2><p>Each tree holds one research project. Ideas are cards; a line from a card to one on its right means the first has to be done before the second can start.</p>${acts}</div>`;
+}
+function route(x1, y1, x2, y2) {
+  const xm = x2 - GAP / 2;
+  if (Math.abs(y2 - y1) < 0.5) return `M${x1} ${y1}H${x2}`;
+  const s = y2 > y1 ? 1 : -1;
+  const r = Math.min(12, Math.abs(y2 - y1) / 2, Math.max(0, xm - x1));
+  return `M${x1} ${y1}H${xm - r}Q${xm} ${y1} ${xm} ${y1 + s * r}V${y2 - s * r}Q${xm} ${y2} ${xm + r} ${y2}H${x2}`;
+}
+function medal(ds, prog) {
+  const C = 2 * Math.PI * 15, o = '<svg viewBox="0 0 40 40" aria-hidden="true">';
+  switch (ds) {
+    case 'done': return o + '<circle cx="20" cy="20" r="17" class="m-done"/><path d="M12.5 20.5l5 5 10-11" class="m-check" fill="none"/></svg>';
+    case 'active': return o + `<circle cx="20" cy="20" r="15" class="m-track" fill="none"/><circle cx="20" cy="20" r="15" class="m-prog" fill="none" stroke-dasharray="${(C * prog / 100).toFixed(2)} ${C.toFixed(2)}" transform="rotate(-90 20 20)"/><text x="20" y="23.5" class="m-pct">${prog}</text></svg>`;
+    case 'available': return o + '<circle cx="20" cy="20" r="15" class="m-ring-avail" fill="none"/><circle cx="20" cy="20" r="5.5" class="m-dot-avail"/></svg>';
+    case 'locked': return o + '<circle cx="20" cy="20" r="16" class="m-lockbg"/><path d="M16 19.5v-2.5a4 4 0 0 1 8 0v2.5" class="m-shackle" fill="none"/><rect x="13.5" y="19" width="13" height="9.5" rx="2" class="m-lock"/></svg>';
+    case 'dropped': return o + '<circle cx="20" cy="20" r="15" class="m-ring-drop" fill="none"/><path d="M14.5 14.5l11 11M25.5 14.5l-11 11" class="m-x" fill="none"/></svg>';
+    case 'superseded': return o + '<circle cx="20" cy="20" r="15" class="m-ring-dash" fill="none"/><path d="M13.5 20h13" class="m-dash" fill="none"/></svg>';
+    default: return o + '<circle cx="20" cy="20" r="15" class="m-ring-cut" fill="none"/><path d="M14 26l12-12" class="m-cut" fill="none"/></svg>';
+  }
+}
+function renderWorld(p) {
+  const N = p.nodes, nodes = sortedNodes(p);
+  el.world.style.width = L.width + 'px';
+  el.world.style.height = L.height + 'px';
+  let bands = '';
+  for (let d = 0; d <= L.maxDepth; d++) bands += `<div class="band${d % 2 ? ' alt' : ''}" style="left:${PADX + d * COLW - GAP / 2}px;width:${COLW}px;height:${L.height}px"></div>`;
+  el.bands.innerHTML = bands;
+
+  const sel = state.sel && N[state.sel] ? state.sel : null;
+  const anc = sel ? ancestors(p, sel) : new Set();
+  let base = '', top = '';
+  for (const n of nodes) for (const q of n.prereqs) {
+    const a = L.pos[q], b = L.pos[n.id];
+    if (!a || !b) continue;
+    const d = route(a.x + W, a.y + H / 2, b.x, b.y + H / 2);
+    const onPath = sel && anc.has(q) && (n.id === sel || anc.has(n.id));
+    const next = sel && q === sel;
+    let cls;
+    if (onPath) cls = 'e e-path';
+    else if (next) cls = 'e e-next';
+    else {
+      const dq = D[q], dn = D[n.id];
+      const faint = dq === 'dropped' || dq === 'superseded' || dq === 'blocked' || dn === 'dropped' || dn === 'superseded' || dn === 'blocked';
+      cls = faint ? 'e e-faint' : N[q].status === 'done' ? 'e e-done' : 'e e-open';
+    }
+    const path = `<path class="${cls}" d="${d}"/>`;
+    if (onPath || next) top += path; else base += path;
+  }
+  el.edges.setAttribute('width', L.width);
+  el.edges.setAttribute('height', L.height);
+  el.edges.innerHTML = base + top;
+
+  let html = '';
+  for (const n of nodes) {
+    const ds = D[n.id], pos = L.pos[n.id], unl = (L.children[n.id] || []).length;
+    const meta = [`<span class="kind">${esc(n.kind)}</span>`];
+    if (n.effort != null) meta.push(`<span title="Estimated effort">~${fmtEff(n.effort)}</span>`);
+    if (unl) meta.push(`<span title="Unlocks ${unl} idea${unl > 1 ? 's' : ''}">&rarr;&thinsp;${unl}</span>`);
+    html += `<div class="node s-${ds}${n.id === sel ? ' sel' : ''}${anc.has(n.id) ? ' anc' : ''}" data-id="${esc(n.id)}" style="left:${pos.x}px;top:${pos.y}px" tabindex="0" role="button" title="${esc(n.title)}" aria-label="${esc(n.title)}: ${DS_LABEL[ds]}">`
+      + `<div class="medal">${medal(ds, n.progress)}</div>`
+      + `<div class="nbody"><div class="ntitle">${esc(n.title || 'Untitled idea')}</div><div class="nmeta">${meta.join('')}</div></div>`
+      + (state.readOnly ? '' : `<span class="port" data-port="${esc(n.id)}" title="Drag onto a later idea to make this its prerequisite"></span>`)
+      + '</div>';
+  }
+  // An "OR" marker on the trunk where competing alternatives branch off.
+  const groups = {};
+  for (const id in L.group) (groups[L.group[id]] = groups[L.group[id]] || []).push(id);
+  for (const k in groups) {
+    const m = groups[k];
+    if (m.length < 2) continue;
+    const d = L.pos[m[0]].d;
+    if (!m.every(id => L.pos[id].d === d)) continue;
+    const ys = m.map(id => L.pos[id].y + H / 2);
+    html += `<div class="orpill" style="left:${PADX + d * COLW - GAP / 2}px;top:${(Math.min(...ys) + Math.max(...ys)) / 2}px" title="Alternatives: finishing one supersedes the others">OR</div>`;
+  }
+  el.nodes.innerHTML = html;
+}
+function renderTierBar() {
+  if (!L) { el.tierbar.innerHTML = ''; return; }
+  const vw = el.stage.clientWidth;
+  let h = '';
+  for (let d = 0; d <= L.maxDepth; d++) {
+    const x = view.x + (PADX + d * COLW + W / 2) * view.k;
+    if (x < -80 || x > vw + 80) continue;
+    h += `<span class="tier" style="left:${x.toFixed(1)}px">Tier ${roman(d + 1)}</span>`;
+  }
+  el.tierbar.innerHTML = h;
+}
+function renderFrontier() {
+  const p = cur();
+  if (!p) { el.frontier.hidden = true; return; }
+  el.frontier.hidden = false;
+  const open = frontierOpen();
+  const nodes = sortedNodes(p);
+  const counts = {};
+  DS_ORDER.forEach(s => { counts[s] = 0; });
+  nodes.forEach(n => { counts[D[n.id]]++; });
+  const act = nodes.filter(n => D[n.id] === 'active');
+  const av = nodes.filter(n => D[n.id] === 'available');
+  const bar = DS_ORDER.filter(s => counts[s]).map(s => `<span class="seg-${s}" style="flex:${counts[s]}" title="${DS_LABEL[s]}: ${counts[s]}"></span>`).join('');
+  const item = n => `<button class="fr-item" data-goto="${esc(n.id)}"><i class="dot s-${D[n.id]}"></i><span class="fr-t">${esc(n.title || 'Untitled idea')}</span><span class="fr-m">${D[n.id] === 'active' ? n.progress + '%' : n.effort != null ? '~' + fmtEff(n.effort) : ''}</span></button>`;
+  const body = el.frontier.querySelector('.fr-body');
+  const scroll = body ? body.scrollTop : 0;
+  el.frontier.innerHTML = `<button class="fr-head" id="frToggle" aria-expanded="${open}"><span class="fr-name">Frontier</span><span class="fr-count num" title="Ideas you can work on now">${act.length + av.length}</span><svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none"/></svg></button>`
+    + `<div class="fr-body"${open ? '' : ' hidden'}>`
+    + `<div class="fr-summary"><div class="fr-bar">${bar}</div><div class="fr-stats"><span class="num">${counts.done}</span> of <span class="num">${nodes.length}</span> ideas done${counts.dropped ? ` · <span class="num">${counts.dropped}</span> dropped` : ''}</div></div>`
+    + `<h3 class="fr-h">Researching</h3>${act.length ? act.map(item).join('') : '<p class="fr-none">Nothing in progress. Start one of the available ideas.</p>'}`
+    + `<h3 class="fr-h">Available</h3>${av.length ? av.map(item).join('') : '<p class="fr-none">Nothing is unlocked right now. Finish a prerequisite to open the next ideas.</p>'}`
+    + `<div class="legend">${DS_ORDER.map(s => `<span><i class="dot s-${s}"></i>${DS_LABEL[s]}</span>`).join('')}</div>`
+    + '<p class="keys edit-only"><kbd>N</kbd> follow-up · <kbd>P</kbd> parallel idea · <kbd>F</kbd> fit · <kbd>Del</kbd> delete · <kbd>Ctrl Z</kbd> undo. Drag the dot on a card\'s right edge onto another card to link them.</p>'
+    + '</div>';
+  const nb = el.frontier.querySelector('.fr-body');
+  if (nb) nb.scrollTop = scroll;
+}
+function why(p, n, ds) {
+  const N = p.nodes;
+  const names = ids => ids.map(id => `“${esc(trunc(N[id].title, 36))}”`).join(', ');
+  switch (ds) {
+    case 'done': return n.findings ? 'Done.' : 'Done. Note what you learned under Findings.';
+    case 'active': return `In progress, ${n.progress}% along.`;
+    case 'available': return n.prereqs.length ? 'All prerequisites are done. Ready to start.' : 'A starting point with no prerequisites. Ready to start.';
+    case 'locked': { const w = n.prereqs.filter(q => N[q].status !== 'done'); return `Locked until ${names(w)} ${w.length > 1 ? 'are' : 'is'} done.`; }
+    case 'superseded': return `Superseded, because the alternative ${names(n.alts.filter(a => N[a].status === 'done'))} is done.`;
+    case 'blocked': return `Cut off, because ${names(n.prereqs.filter(q => ['dropped', 'blocked', 'superseded'].includes(D[q])))} will not be done. Drop this idea or link it to another prerequisite.`;
+    default: return 'Dropped. Ideas that depend on it are cut off.';
+  }
+}
+function pathInfo(p, n) {
+  if (n.status === 'done') return '';
+  const open = [...ancestors(p, n.id)].map(id => p.nodes[id]).filter(m => m.status !== 'done');
+  const all = [...open, n];
+  const est = all.filter(m => m.effort != null);
+  const sum = est.reduce((s, m) => s + m.effort, 0);
+  const unk = all.length - est.length;
+  const dead = open.some(m => m.status === 'dropped');
+  return `<div class="pathbox"><span class="lbl">Route to this idea</span>`
+    + `<p><b class="num">${all.length}</b> open step${all.length > 1 ? 's' : ''}${est.length ? ` · <b class="num">~${fmtEff(sum)}</b> estimated` : ''}${unk ? ` · ${unk} without an estimate` : ''}</p>`
+    + (dead ? '<p class="warn">The route runs through a dropped idea.</p>' : '')
+    + (open.length ? '<p class="hint">The blue lines on the tree trace this route.</p>' : '')
+    + '</div>';
+}
+function renderInspector() {
+  const p = cur();
+  const n = p && state.sel ? p.nodes[state.sel] : null;
+  if (!n || !L) { el.insp.hidden = true; el.insp.innerHTML = ''; return; }
+  const N = p.nodes, ds = D[n.id] || 'locked', ro = state.readOnly ? ' disabled' : '';
+  const chip = (id, rm) => `<span class="chip"><i class="dot s-${D[id]}"></i><button class="chip-t" data-act="goto" data-id="${esc(id)}" title="${esc(N[id].title)}">${esc(trunc(N[id].title || 'Untitled idea', 38))}</button>${rm && !state.readOnly ? `<button class="chip-x" data-act="${rm}" data-id="${esc(id)}" aria-label="Remove ${esc(N[id].title)}">&times;</button>` : ''}</span>`;
+  const list = (ids, rm, none) => ids.length ? `<div class="chips">${ids.map(id => chip(id, rm)).join('')}</div>` : `<p class="none">${none}</p>`;
+  const bySeq = ids => ids.slice().sort((a, b) => N[a].seq - N[b].seq);
+  const preOpts = state.readOnly ? [] : sortedNodes(p).filter(m => m.id !== n.id && !n.prereqs.includes(m.id) && !dependsOn(p, m.id, n.id));
+  const altOpts = state.readOnly ? [] : sortedNodes(p).filter(m => m.id !== n.id && !n.alts.includes(m.id) && !dependsOn(p, m.id, n.id) && !dependsOn(p, n.id, m.id));
+  const adder = (kind, opts, label) => opts.length ? `<select class="addsel" data-add="${kind}" aria-label="${label}"><option value="">+ ${label}…</option>${opts.map(m => `<option value="${esc(m.id)}">${esc(trunc(m.title || 'Untitled idea', 50))}</option>`).join('')}</select>` : '';
+  el.insp.hidden = false;
+  el.insp.innerHTML = `<div class="i-top"><span class="pill s-${ds}">${DS_LABEL[ds]}</span><span class="i-tier">Tier ${roman(L.pos[n.id].d + 1)}</span><button class="icon-btn" data-act="close" aria-label="Close details">&times;</button></div>`
+    + `<label class="sr" for="f-title">Idea title</label><textarea id="f-title" class="i-title" data-f="title" rows="2" maxlength="200" placeholder="Name this idea"${ro}>${esc(n.title)}</textarea>`
+    + `<div class="seg" role="group" aria-label="Status">${STATUSES.map(s => `<button data-status="${s}" class="${n.status === s ? 'on' : ''}" aria-pressed="${n.status === s}"${ro}>${STATUS_LABEL[s]}</button>`).join('')}</div>`
+    + `<p class="why">${why(p, n, ds)}</p>`
+    + (n.status === 'active' ? `<div class="field"><label class="lbl" for="f-prog">Progress <span class="num" id="progVal">${n.progress}%</span></label><input id="f-prog" type="range" min="0" max="100" step="5" value="${n.progress}" data-f="progress"${ro}></div>` : '')
+    + `<div class="row2"><div class="field"><label class="lbl" for="f-kind">Kind</label><select id="f-kind" data-f="kind"${ro}>${KINDS.map(k => `<option${k === n.kind ? ' selected' : ''}>${k}</option>`).join('')}</select></div>`
+    + `<div class="field"><label class="lbl" for="f-eff">Effort, days</label><input id="f-eff" class="num" type="number" min="0" step="0.5" inputmode="decimal" data-f="effort" placeholder="Not estimated" value="${n.effort == null ? '' : n.effort}"${ro}></div></div>`
+    + `<section class="field"><h4 class="lbl">Requires</h4>${list(bySeq(n.prereqs), 'rmpre', 'Nothing. This is a starting point.')}${adder('pre', preOpts, 'Add prerequisite')}</section>`
+    + `<section class="field"><h4 class="lbl">Unlocks</h4>${list(bySeq(L.children[n.id] || []), null, 'Nothing yet. Add a follow-up below.')}</section>`
+    + `<section class="field"><h4 class="lbl">Alternative to</h4>${list(bySeq(n.alts), 'rmalt', 'None. Alternatives are competing routes; finishing one supersedes the others.')}${adder('alt', altOpts, 'Add alternative')}</section>`
+    + `<div class="field"><label class="lbl" for="f-notes">Plan</label><textarea id="f-notes" data-f="notes" rows="4" placeholder="What is the idea, and how would you test it?"${ro}>${esc(n.notes)}</textarea></div>`
+    + `<div class="field"><label class="lbl" for="f-find">Findings</label><textarea id="f-find" data-f="findings" rows="3" placeholder="What did you learn? Dead ends count too."${ro}>${esc(n.findings)}</textarea></div>`
+    + pathInfo(p, n)
+    + '<div class="i-acts edit-only"><button class="btn" data-act="follow" title="An idea that needs this one first (N)">+ Follow-up</button><button class="btn" data-act="parallel" title="An idea with the same prerequisites (P)">+ Parallel</button><button class="btn" data-act="alt" title="A competing route with the same prerequisites">+ Alternative</button></div>'
+    + '<div class="i-acts2 edit-only"><span class="lbl">Order</span><button class="btn sm" data-act="up" aria-label="Move up among siblings">&uarr;</button><button class="btn sm" data-act="down" aria-label="Move down among siblings">&darr;</button><span class="grow"></span><button class="btn danger" data-act="del">Delete idea</button></div>'
+    + `<p class="i-meta">Added ${fmtDate(n.created)} · edited ${fmtDate(n.updated)}</p>`;
+}
+
+// ---------- selection and camera
+function select(id, { center = false, force = false, focus = false } = {}) {
+  const p = cur();
+  state.sel = p && id && p.nodes[id] ? id : null;
+  lastCo = null;
+  render();
+  renderInspector();
+  if (center && state.sel) centerOn(state.sel, force);
+  if (focus && state.sel) { const t = $('f-title'); if (t && !t.disabled) { t.focus({ preventScroll: true }); t.select(); } }
+}
+function applyView() {
+  el.world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.k})`;
+  const g = 24 * view.k;
+  el.viewport.style.backgroundSize = `${g}px ${g}px`;
+  el.viewport.style.backgroundPosition = `${view.x}px ${view.y}px`;
+  renderTierBar();
+}
+function area() {
+  const w = el.stage.clientWidth, h = el.stage.clientHeight, wide = w > 720;
+  let l = 16, r = 16, t = 40, b = 16;
+  if (wide && !el.frontier.hidden && frontierOpen()) l = el.frontier.offsetWidth + 28;
+  if (!el.insp.hidden) { if (wide) r = el.insp.offsetWidth + 28; else b = el.insp.offsetHeight + 12; }
+  if (!wide && !el.frontier.hidden) t = el.frontier.offsetHeight + 52;
+  return { l, r, t, b, w, h, aw: Math.max(80, w - l - r), ah: Math.max(80, h - t - b) };
+}
+let animId = 0;
+function animateTo(target) {
+  cancelAnimationFrame(animId);
+  if (reduceMotion) { view = target; applyView(); rememberView(); return; }
+  const s = { ...view }, t0 = performance.now(), dur = 280;
+  const step = now => {
+    const u = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - u, 3);
+    view = { x: s.x + (target.x - s.x) * e, y: s.y + (target.y - s.y) * e, k: s.k + (target.k - s.k) * e };
+    applyView();
+    if (u < 1) animId = requestAnimationFrame(step); else rememberView();
+  };
+  animId = requestAnimationFrame(step);
+}
+function fit(animate = true) {
+  if (!L) return;
+  const A = area();
+  const k = clamp(Math.min(A.aw / L.width, A.ah / L.height), KMIN, 1.1);
+  const target = { k, x: A.l + (A.aw - L.width * k) / 2, y: A.t + Math.max(0, (A.ah - L.height * k) / 2) };
+  if (animate) animateTo(target); else { view = target; applyView(); rememberView(); }
+}
+function centerOn(id, force) {
+  const pos = L && L.pos[id];
+  if (!pos) return;
+  const A = area(), k = view.k;
+  const cx = (pos.x + W / 2) * k + view.x, cy = (pos.y + H / 2) * k + view.y;
+  const inside = cx > A.l + W * k / 2 && cx < A.w - A.r - W * k / 2 && cy > A.t + H * k / 2 && cy < A.h - A.b - H * k / 2;
+  if (inside && !force) return;
+  animateTo({ k, x: A.l + A.aw / 2 - (pos.x + W / 2) * k, y: A.t + A.ah / 2 - (pos.y + H / 2) * k });
+}
+function zoomAt(clientX, clientY, factor) {
+  const r = el.viewport.getBoundingClientRect();
+  const px = clientX - r.left, py = clientY - r.top;
+  const k = clamp(view.k * factor, KMIN, KMAX);
+  view = { k, x: px - (px - view.x) * k / view.k, y: py - (py - view.y) * k / view.k };
+  applyView();
+}
+function zoomCenter(factor) {
+  const r = el.viewport.getBoundingClientRect(), A = area();
+  zoomAt(r.left + A.l + A.aw / 2, r.top + A.t + A.ah / 2, factor);
+  rememberView();
+}
+function toWorld(cx, cy) {
+  const r = el.viewport.getBoundingClientRect();
+  return { x: (cx - r.left - view.x) / view.k, y: (cy - r.top - view.y) / view.k };
+}
+
+// ---------- canvas gestures: drag to pan, pinch or Ctrl+wheel to zoom, tap to select
+const ptrs = new Map();
+let gesture = null;
+el.viewport.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  const port = e.target.closest('[data-port]');
+  if (port && !state.readOnly) { startConnect(e, port.dataset.port); return; }
+  cancelAnimationFrame(animId);
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  try { el.viewport.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  if (ptrs.size === 1) gesture = { type: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y, moved: false, target: e.target };
+  else if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()];
+    gesture = { type: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, k0: view.k, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, vx: view.x, vy: view.y, moved: true };
+  }
+});
+el.viewport.addEventListener('pointermove', e => {
+  if (!ptrs.has(e.pointerId) || !gesture) return;
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (gesture.type === 'pan' && ptrs.size === 1) {
+    const dx = e.clientX - gesture.sx, dy = e.clientY - gesture.sy;
+    if (!gesture.moved && Math.hypot(dx, dy) > 5) { gesture.moved = true; el.viewport.classList.add('panning'); }
+    if (gesture.moved) { view.x = gesture.vx + dx; view.y = gesture.vy + dy; applyView(); }
+  } else if (gesture.type === 'pinch' && ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()];
+    const r = el.viewport.getBoundingClientRect();
+    const k = clamp(gesture.k0 * Math.hypot(a.x - b.x, a.y - b.y) / gesture.d0, KMIN, KMAX);
+    const wx = (gesture.cx - r.left - gesture.vx) / gesture.k0, wy = (gesture.cy - r.top - gesture.vy) / gesture.k0;
+    view = { k, x: (a.x + b.x) / 2 - r.left - wx * k, y: (a.y + b.y) / 2 - r.top - wy * k };
+    applyView();
+  }
+});
+// A tap selects on pointerup and may open the inspector under the finger or cursor;
+// the browser's follow-up click must not land on whatever button is now there.
+function swallowClick() {
+  const h = ev => { ev.stopPropagation(); ev.preventDefault(); };
+  document.addEventListener('click', h, { capture: true, once: true });
+  setTimeout(() => document.removeEventListener('click', h, { capture: true }), 450);
+}
+function endPointer(e) {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if (gesture && gesture.type === 'pan' && !gesture.moved && e.type === 'pointerup') {
+    swallowClick();
+    const nodeEl = gesture.target && gesture.target.closest ? gesture.target.closest('.node') : null;
+    select(nodeEl ? nodeEl.dataset.id : null, { center: true });
+  }
+  if (ptrs.size === 0) { gesture = null; el.viewport.classList.remove('panning'); rememberView(); }
+  else if (ptrs.size === 1) { const [o] = [...ptrs.values()]; gesture = { type: 'pan', sx: o.x, sy: o.y, vx: view.x, vy: view.y, moved: true, target: null }; }
+}
+el.viewport.addEventListener('pointerup', endPointer);
+el.viewport.addEventListener('pointercancel', endPointer);
+let wheelT = 0;
+el.viewport.addEventListener('wheel', e => {
+  e.preventDefault();
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+  if (e.ctrlKey || e.metaKey) zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * unit * 0.01));
+  else { view.x -= e.deltaX * unit; view.y -= e.deltaY * unit; applyView(); }
+  clearTimeout(wheelT);
+  wheelT = setTimeout(rememberView, 250);
+}, { passive: false });
+
+// Drag from a card's right-hand dot onto another card: the target now requires the source.
+function startConnect(e, fromId) {
+  e.preventDefault();
+  const p = cur();
+  if (!p || !L || !L.pos[fromId]) return;
+  const from = L.pos[fromId], sx = from.x + W, sy = from.y + H / 2;
+  const tmp = document.createElementNS(SVGNS, 'path');
+  tmp.setAttribute('class', 'e e-temp');
+  el.edges.appendChild(tmp);
+  try { el.viewport.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  let hover = null;
+  const targetAt = ev => { const hit = document.elementFromPoint(ev.clientX, ev.clientY); return hit && hit.closest ? hit.closest('.node') : null; };
+  const onMove = ev => {
+    if (ev.pointerId !== e.pointerId) return;
+    const w = toWorld(ev.clientX, ev.clientY);
+    tmp.setAttribute('d', `M${sx} ${sy}C${sx + 70} ${sy} ${w.x - 70} ${w.y} ${w.x} ${w.y}`);
+    const t = targetAt(ev);
+    if (hover && hover !== t) hover.classList.remove('drop-ok', 'drop-bad');
+    hover = t;
+    if (t) {
+      const tid = t.dataset.id;
+      const ok = tid !== fromId && !p.nodes[tid].prereqs.includes(fromId) && !dependsOn(p, fromId, tid);
+      t.classList.toggle('drop-ok', ok);
+      t.classList.toggle('drop-bad', !ok);
+    }
+  };
+  const onEnd = ev => {
+    if (ev.pointerId !== e.pointerId) return;
+    el.viewport.removeEventListener('pointermove', onMove);
+    el.viewport.removeEventListener('pointerup', onEnd);
+    el.viewport.removeEventListener('pointercancel', onEnd);
+    const t = ev.type === 'pointerup' ? targetAt(ev) : null;
+    tmp.remove();
+    if (t && t.dataset.id !== fromId) linkPrereq(t.dataset.id, fromId);
+    else render();
+  };
+  el.viewport.addEventListener('pointermove', onMove);
+  el.viewport.addEventListener('pointerup', onEnd);
+  el.viewport.addEventListener('pointercancel', onEnd);
+}
+
+// ---------- panel and control events
+el.nodes.addEventListener('keydown', e => {
+  const n = e.target.closest('.node');
+  if (!n || (e.key !== 'Enter' && e.key !== ' ')) return;
+  e.preventDefault();
+  const id = n.dataset.id;
+  select(id);
+  const again = el.nodes.querySelector(`.node[data-id="${CSS.escape(id)}"]`);
+  if (again) again.focus({ preventScroll: true });
+});
+el.frontier.addEventListener('click', e => {
+  if (e.target.closest('#frToggle')) { prefs.frontierOpen = !frontierOpen(); savePrefs(); renderFrontier(); return; }
+  const g = e.target.closest('[data-goto]');
+  if (!g) return;
+  if (window.innerWidth <= 720) { prefs.frontierOpen = false; savePrefs(); }
+  select(g.dataset.goto, { center: true, force: true });
+});
+el.insp.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  const id = state.sel;
+  if (!b || !id) return;
+  if (b.dataset.status) { setStatus(id, b.dataset.status); return; }
+  const tid = b.dataset.id;
+  switch (b.dataset.act) {
+    case 'close': select(null); break;
+    case 'goto': select(tid, { center: true, force: true }); break;
+    case 'rmpre': mutate(p => { const m = p.nodes[id]; m.prereqs = m.prereqs.filter(x => x !== tid); }, { insp: true }); break;
+    case 'rmalt': mutate(p => removeFromGroup(p, tid), { insp: true }); break;
+    case 'follow': addIdea('follow'); break;
+    case 'parallel': addIdea('parallel'); break;
+    case 'alt': addIdea('alt'); break;
+    case 'up': move(id, -1); break;
+    case 'down': move(id, 1); break;
+    case 'del': deleteNode(id); break;
+  }
+});
+el.insp.addEventListener('change', e => {
+  const t = e.target, id = state.sel;
+  if (!id) return;
+  if (t.dataset.add) {
+    if (!t.value) return;
+    if (t.dataset.add === 'pre') linkPrereq(id, t.value); else addAlt(id, t.value);
+    return;
+  }
+  if (t.dataset.f === 'kind') mutate(p => { p.nodes[id].kind = t.value; p.nodes[id].updated = nowISO(); });
+});
+el.insp.addEventListener('input', e => {
+  const t = e.target, f = t.dataset.f, id = state.sel;
+  if (!f || !id) return;
+  if (f === 'title' || f === 'notes' || f === 'findings') {
+    const v = f === 'title' ? t.value.replace(/\s*\n\s*/g, ' ') : t.value;
+    mutate(p => { p.nodes[id][f] = v; p.nodes[id].updated = nowISO(); }, { co: f + id, delay: 700 });
+  } else if (f === 'effort') {
+    const raw = t.value.trim();
+    const v = raw === '' ? null : Number(raw);
+    if (v !== null && !(v >= 0)) return;
+    mutate(p => { p.nodes[id].effort = v; p.nodes[id].updated = nowISO(); }, { co: f + id, delay: 700 });
+  } else if (f === 'progress') {
+    const v = clamp(Number(t.value) || 0, 0, 100);
+    const pv = $('progVal'), w = el.insp.querySelector('.why');
+    if (pv) pv.textContent = v + '%';
+    if (w) w.textContent = `In progress, ${v}% along.`;
+    mutate(p => { p.nodes[id].progress = v; p.nodes[id].updated = nowISO(); }, { co: f + id, delay: 400 });
+  }
+});
+el.insp.addEventListener('keydown', e => { if (e.target.id === 'f-title' && e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+el.insp.addEventListener('focusout', () => { lastCo = null; });
+
+el.projSel.addEventListener('change', () => openProject(el.projSel.value));
+el.addBtn.addEventListener('click', () => addIdea(state.sel ? 'follow' : 'root'));
+el.undoBtn.addEventListener('click', undo);
+el.zIn.addEventListener('click', () => zoomCenter(1.2));
+el.zOut.addEventListener('click', () => zoomCenter(1 / 1.2));
+el.zFit.addEventListener('click', () => fit());
+el.empty.addEventListener('click', e => {
+  const b = e.target.closest('[data-empty]');
+  if (!b) return;
+  const a = b.dataset.empty;
+  if (a === 'new') newProject();
+  else if (a === 'import') openModal('import');
+  else if (a === 'example') { const ex = exampleProject(); ex.id = uid('p'); ex.order = nextOrder(); state.projects[ex.id] = ex; scheduleSave(ex.id); openProject(ex.id, { fresh: true }); }
+});
+
+// Tree menu: rename, new tree, delete tree
+function openPop(focusName) {
+  const p = cur();
+  if (!p) return;
+  el.projPop.innerHTML = `<div class="field"><label class="lbl" for="pmName">Tree name</label><input id="pmName" class="inp" maxlength="120" value="${esc(p.name)}"${state.readOnly ? ' disabled' : ''}></div>`
+    + '<div class="pm-acts edit-only" id="pmActs"><button class="btn" data-pm="new">New tree</button><button class="btn danger" data-pm="del">Delete tree</button></div>'
+    + `<div class="pm-confirm" id="pmConfirm" hidden><p>Delete “${esc(trunc(p.name, 40))}” and its ${Object.keys(p.nodes).length} ideas? You can undo right after.</p><div class="pm-acts"><button class="btn danger solid" data-pm="del-yes">Delete tree</button><button class="btn" data-pm="del-no">Keep it</button></div></div>`;
+  el.projPop.hidden = false;
+  el.projMenuBtn.setAttribute('aria-expanded', 'true');
+  if (focusName) { const i = $('pmName'); if (i && !i.disabled) { i.focus(); i.select(); } }
+}
+function closePop() { el.projPop.hidden = true; el.projMenuBtn.setAttribute('aria-expanded', 'false'); }
+el.projMenuBtn.addEventListener('click', () => (el.projPop.hidden ? openPop(false) : closePop()));
+el.projPop.addEventListener('input', e => {
+  if (e.target.id !== 'pmName') return;
+  const p = cur();
+  if (!p || state.readOnly) return;
+  p.name = e.target.value.trim() ? e.target.value : 'Untitled tree';
+  p.updated = nowISO();
+  scheduleSave(p.id, 600);
+  renderHeader();
+});
+el.projPop.addEventListener('keydown', e => { if (e.target.id === 'pmName' && e.key === 'Enter') { e.preventDefault(); closePop(); } });
+el.projPop.addEventListener('click', e => {
+  const b = e.target.closest('[data-pm]');
+  if (!b) return;
+  const a = b.dataset.pm;
+  if (a === 'new') { closePop(); newProject(); }
+  else if (a === 'del') { $('pmConfirm').hidden = false; $('pmActs').hidden = true; }
+  else if (a === 'del-no') { $('pmConfirm').hidden = true; $('pmActs').hidden = false; }
+  else if (a === 'del-yes') deleteProject();
+});
+document.addEventListener('pointerdown', e => {
+  if (!el.projPop.hidden && !el.projPop.contains(e.target) && !el.projMenuBtn.contains(e.target)) closePop();
+});
+
+// Export / import
+let exFmt = 'json', downloader;
+function outline(p) {
+  const lay = computeLayout(p), der = computeDerived(p), N = p.nodes, lines = [`# ${p.name}`, ''];
+  const walk = (id, depth) => {
+    const n = N[id], pad = '  '.repeat(depth), tags = [];
+    if (der[id] !== 'done') tags.push(DS_LABEL[der[id]].toLowerCase() + (n.status === 'active' ? ` ${n.progress}%` : ''));
+    if (n.effort != null) tags.push('~' + fmtEff(n.effort));
+    const extra = n.prereqs.filter(q => q !== lay.parent[id]);
+    if (extra.length) tags.push('also needs: ' + extra.map(q => N[q].title).join('; '));
+    if (n.alts.length) tags.push('alternative to: ' + n.alts.map(a => N[a].title).join('; '));
+    lines.push(`${pad}- [${n.status === 'done' ? 'x' : ' '}] ${n.title}${tags.length ? ` (${tags.join(', ')})` : ''}`);
+    if (n.notes.trim()) lines.push(`${pad}  Plan: ${n.notes.trim().replace(/\s*\n\s*/g, ' ')}`);
+    if (n.findings.trim()) lines.push(`${pad}  Findings: ${n.findings.trim().replace(/\s*\n\s*/g, ' ')}`);
+    (lay.kids[id] || []).forEach(c => walk(c, depth + 1));
+  };
+  lay.roots.forEach(r => walk(r, 0));
+  return lines.join('\n');
+}
+function exportText() {
+  const scope = $('exScope').value;
+  const ps = scope === 'all' ? projectList() : [cur()].filter(Boolean);
+  if (exFmt === 'md') return ps.map(outline).join('\n\n');
+  return JSON.stringify({ format: 'research-tech-tree', version: 1, exported: nowISO(), projects: ps.map(p => ({ id: p.id, ...toBody(p) })) }, null, 2);
+}
+function refreshExport() { $('exText').value = exportText(); }
+async function openModal(tab) {
+  el.modal.hidden = false;
+  showTab(tab || 'export');
+  refreshExport();
+  $('imMsg').textContent = '';
+  if (downloader === undefined) {
+    downloader = null;
+    if (!window.claude) downloader = 'blob';
+    else { try { downloader = (await window.claude.use('downloads')) || null; } catch (err) { downloader = null; } }
+  }
+  $('exDl').hidden = !downloader;
+}
+function closeModal() { el.modal.hidden = true; }
+function showTab(tab) {
+  if (state.readOnly) tab = 'export';
+  el.modal.querySelectorAll('[data-tab]').forEach(b => { const on = b.dataset.tab === tab; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  el.modal.querySelectorAll('[data-pane]').forEach(s => { s.hidden = s.dataset.pane !== tab; });
+}
+el.dataBtn.addEventListener('click', () => openModal('export'));
+el.modal.addEventListener('click', e => {
+  if (e.target === el.modal || e.target.closest('[data-close]')) { closeModal(); return; }
+  const tab = e.target.closest('[data-tab]');
+  if (tab) { showTab(tab.dataset.tab); return; }
+  const f = e.target.closest('[data-fmt]');
+  if (f) { exFmt = f.dataset.fmt; el.modal.querySelectorAll('[data-fmt]').forEach(b => b.classList.toggle('on', b === f)); refreshExport(); }
+});
+$('exScope').addEventListener('change', refreshExport);
+$('exCopy').addEventListener('click', () => {
+  const ta = $('exText'), txt = ta.value;
+  const fallback = () => { ta.focus(); ta.select(); toast('Selected. Press Ctrl+C (⌘C) to copy.'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(() => toast('Copied'), fallback);
+  else fallback();
+});
+$('exDl').addEventListener('click', async () => {
+  const txt = $('exText').value;
+  const p = cur();
+  const stem = (exportScopeAll() ? 'research-trees' : (p ? p.name : 'tree')).replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'tree';
+  const filename = stem + (exFmt === 'md' ? '.md' : '.json');
+  if (downloader === 'blob') {
+    const url = URL.createObjectURL(new Blob([txt], { type: exFmt === 'md' ? 'text/markdown' : 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } else if (downloader) {
+    try { await downloader.save({ filename, data: txt }); }
+    catch (err) { if (!err || err.code !== 'declined') toast('Download did not go through. Use Copy instead.'); }
+  }
+});
+const exportScopeAll = () => $('exScope').value === 'all';
+function importText(txt) {
+  let data;
+  try { data = JSON.parse(txt); } catch (e) { return 'That is not valid JSON. Paste the whole export, from the first { to the last }.'; }
+  let list = [];
+  if (data && Array.isArray(data.projects)) list = data.projects;
+  else if (data && data.projects && typeof data.projects === 'object') list = Object.entries(data.projects).map(([id, v]) => ({ id, ...v }));
+  else if (data && data.nodes) list = [data];
+  if (!list.length) return 'No trees found in that JSON.';
+  const names = [];
+  let first = null;
+  for (const raw of list) {
+    const id = uid('p');
+    const p = normProject(id, raw);
+    p.order = nextOrder();
+    state.projects[id] = p;
+    scheduleSave(id);
+    names.push(p.name);
+    if (!first) first = id;
+  }
+  openProject(first, { fresh: true });
+  closeModal();
+  toast(`Imported ${names.length} tree${names.length > 1 ? 's' : ''}: ${trunc(names.join(', '), 80)}`);
+  return '';
+}
+$('imGo').addEventListener('click', () => { if (state.readOnly) return; const msg = importText($('imText').value); $('imMsg').textContent = msg; });
+$('imFile').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { $('imText').value = String(r.result || ''); $('imMsg').textContent = `Loaded ${f.name}. Press Import to add it.`; };
+  r.readAsText(f);
+  e.target.value = '';
+});
+
+// Toasts
+let toastT = 0;
+function toast(msg, opt = {}) {
+  el.toast.innerHTML = `<span>${esc(msg)}</span>${opt.action ? `<button type="button">${esc(opt.action)}</button>` : ''}`;
+  el.toast.hidden = false;
+  clearTimeout(toastT);
+  toastT = setTimeout(() => { el.toast.hidden = true; }, opt.action ? 6500 : 3000);
+  if (opt.action) el.toast.querySelector('button').onclick = () => { el.toast.hidden = true; opt.onAction(); };
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  const t = e.target;
+  const typing = t && t.matches && t.matches('input, textarea, select, [contenteditable="true"]');
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { if (typing) return; e.preventDefault(); undo(); return; }
+  if (e.key === 'Escape') {
+    if (!el.modal.hidden) closeModal();
+    else if (!el.projPop.hidden) closePop();
+    else if (typing) t.blur();
+    else if (state.sel) select(null);
+    return;
+  }
+  if (typing || e.ctrlKey || e.metaKey || e.altKey || !el.modal.hidden || !cur()) return;
+  const k = e.key.toLowerCase();
+  if (k === 'f') { e.preventDefault(); fit(); }
+  else if (k === 'n') { e.preventDefault(); addIdea(state.sel ? 'follow' : 'root'); }
+  else if (k === 'p' && state.sel) { e.preventDefault(); addIdea('parallel'); }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && state.sel) { e.preventDefault(); deleteNode(state.sel); }
+});
+window.addEventListener('resize', () => renderTierBar());
+
+// ---------- storage back ends
+function ready() {
+  state.loaded = true;
+  openProject(state.projects[prefs.pid] ? prefs.pid : null);
+}
+function startLocal() {
+  state.mode = 'local';
+  let stored = null;
+  try { const raw = localStorage.getItem(DATA_KEY); stored = raw ? JSON.parse(raw) : null; } catch (e) { stored = null; }
+  const projects = stored && stored.projects && typeof stored.projects === 'object' ? stored.projects : null;
+  if (projects && Object.keys(projects).length) {
+    for (const [id, raw] of Object.entries(projects)) state.projects[id] = normProject(id, raw);
+  } else if (!stored) {
+    const ex = exampleProject();
+    state.projects[ex.id] = ex;
+  }
+  state.storageOK = writeLocal();
+  ready();
+}
+let resubscribed = false;
+function onRemote(snap) {
+  const seen = new Set();
+  let changed = false;
+  for (const d of snap.docs) {
+    const id = d.id;
+    seen.add(id);
+    if (isPending(id)) continue;   // a local edit is about to overwrite this document anyway
+    const np = normProject(id, d.data() || {});
+    const key = stable(toBody(np));
+    if (state.projects[id] && (key === lastWritten[id] || key === stable(toBody(normProject(id, toBody(state.projects[id])))))) continue;
+    state.projects[id] = np;
+    lastWritten[id] = key;
+    changed = true;
+  }
+  for (const id of Object.keys(state.projects)) if (!seen.has(id) && !isPending(id)) { delete state.projects[id]; changed = true; }
+  if (!state.loaded) { ready(); return; }
+  if (!changed) return;
+  if (!cur()) { openProject(null); return; }
+  if (state.sel && !cur().nodes[state.sel]) state.sel = null;
+  render();
+  const a = document.activeElement;
+  if (!(a && el.insp.contains(a) && a.matches('input, textarea'))) renderInspector();
+}
+function subscribe() {
+  DB.collection('projects').onSnapshot(onRemote, err => {
+    if (err && err.code === 'unavailable' && !resubscribed) { resubscribed = true; setTimeout(subscribe, 1500); return; }
+    if (err && err.code === 'revoked') { setReadOnly(true); return; }
+    state.saveError = true;
+    updateSave();
+    toast('Lost the connection to this page\'s storage. Reload to reconnect.');
+  });
+}
+function startDb(db) {
+  DB = db;
+  state.mode = 'db';
+  subscribe();
+  window.claude.use('user')
+    .then(u => (u ? u.can('data.write') : null))
+    .then(v => { if (v === false) setReadOnly(true); })
+    .catch(() => {});
+}
+function boot() {
+  render();
+  const c = window.claude;
+  if (c && typeof c.use === 'function') c.use('db').then(db => (db ? startDb(db) : startLocal())).catch(() => startLocal());
+  else startLocal();
+}
+boot();
+})();
+</script>
+</body>
+</html>
