@@ -32,6 +32,8 @@
   --drop-soft: #F4DEDB;
   --route: #6A4C9C;          /* civics-style violet: route nodes */
   --route-soft: #ECE5F5;
+  --glow: rgba(148, 101, 16, .5);
+  --glow-avail: rgba(24, 120, 91, .42);
   --shadow: rgba(21, 33, 46, .12);
   --scrim: rgba(21, 33, 46, .38);
   --font-display: "Marcellus SC", "Iowan Old Style", Georgia, serif;
@@ -44,7 +46,7 @@
     --ink: #E4EAF1; --muted: #93A3B4; --line: #2C3B4D; --line-strong: #50647B;
     --accent: #DAAA48; --accent-soft: #3A2F16; --done-bg: #221E14;
     --active: #6FA5FF; --active-soft: #1B2E4C; --avail: #48C795; --avail-soft: #14352A;
-    --drop: #E07D72; --drop-soft: #3B201D; --route: #B9A0EC; --route-soft: #2B2342; --shadow: rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
+    --drop: #E07D72; --drop-soft: #3B201D; --route: #B9A0EC; --route-soft: #2B2342; --glow: rgba(218, 170, 72, .55); --glow-avail: rgba(72, 199, 149, .45); --shadow: rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
     color-scheme: dark;
   }
 }
@@ -53,7 +55,7 @@
   --ink: #E4EAF1; --muted: #93A3B4; --line: #2C3B4D; --line-strong: #50647B;
   --accent: #DAAA48; --accent-soft: #3A2F16; --done-bg: #221E14;
   --active: #6FA5FF; --active-soft: #1B2E4C; --avail: #48C795; --avail-soft: #14352A;
-  --drop: #E07D72; --drop-soft: #3B201D; --route: #B9A0EC; --route-soft: #2B2342; --shadow: rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
+  --drop: #E07D72; --drop-soft: #3B201D; --route: #B9A0EC; --route-soft: #2B2342; --glow: rgba(218, 170, 72, .55); --glow-avail: rgba(72, 199, 149, .45); --shadow: rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
   color-scheme: dark;
 }
 
@@ -104,7 +106,11 @@ button { cursor: pointer; }
 .zoom .btn { border-radius: 0; margin-left: -1px; }
 .zoom .btn:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
 .zoom .btn:last-child { border-radius: 0 6px 6px 0; }
-.save { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.meta-r { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+#soundBtn svg { width: 18px; height: 18px; }
+#soundBtn[aria-pressed="false"] .snd-on, #soundBtn[aria-pressed="true"] .snd-off { display: none; }
+#soundBtn[aria-pressed="false"] { color: var(--muted); }
+.save { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 .save .sdot { width: 7px; height: 7px; border-radius: 50%; background: var(--avail); }
 .save.wait .sdot { background: var(--line-strong); }
 .save.err .sdot { background: var(--drop); }
@@ -178,12 +184,22 @@ button { cursor: pointer; }
 /* Route cards are signpost-shaped and carry a diamond, the flowchart sign for a decision. */
 .node.route { border-radius: 8px 42px 42px 8px; padding-right: 26px; }
 .kind.k-route { background: var(--route-soft); color: var(--route); }
+/* Completion feedback: a burst on what finished, a pop on parents whose next layer moved, a glow on what opened. */
+@keyframes fx-burst { 0% { box-shadow: 0 0 0 0 var(--glow); } 100% { box-shadow: 0 0 0 20px transparent; } }
+@keyframes fx-open { 0% { box-shadow: 0 0 0 0 var(--glow-avail); } 100% { box-shadow: 0 0 0 16px transparent; } }
+@keyframes fx-pop { 0% { transform: scale(.55); } 55% { transform: scale(1.18); } 100% { transform: scale(1); } }
+.node.fx-done { animation: fx-burst .8s ease-out; }
+.node.fx-cascade { animation: fx-burst .9s ease-out .3s backwards; }
+.node.fx-unlock { animation: fx-open 1s ease-out .2s backwards; }
+.node.fx-done .medal, .node.fx-tick .medal { animation: fx-pop .5s cubic-bezier(.3, 1.5, .5, 1); }
+.node.fx-cascade .medal { animation: fx-pop .5s cubic-bezier(.3, 1.5, .5, 1) .3s backwards; }
 
 .m-done { fill: var(--accent); }
 .m-check { stroke: var(--surface); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .m-track { stroke: var(--active-soft); stroke-width: 4; }
 .m-prog { stroke: var(--active); stroke-width: 4; stroke-linecap: round; }
 .m-pct { fill: var(--active); font: 600 10px var(--font-mono); text-anchor: middle; }
+.m-pct.sm { font-size: 8.5px; }
 .m-ring-avail { stroke: var(--avail); stroke-width: 2.5; }
 .m-dot-avail { fill: var(--avail); }
 .m-lockbg { fill: var(--surface-2); stroke: var(--line); stroke-width: 1.5; }
@@ -303,6 +319,7 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
 .type-seg button[data-type="route"].on { background: var(--route); }
 .routebox { display: grid; gap: 4px; padding: 10px 12px; border-radius: 8px; background: var(--route-soft); }
 .routebox p { margin: 0; font-size: 13px; }
+.routebox.subbox { background: var(--surface-2); border: 1px solid var(--line); }
 .cmp-wrap { overflow-x: auto; }
 .cmp { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .cmp th { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); font: 600 10px/1.3 var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
@@ -345,7 +362,7 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
 @media (max-width: 720px) {
   .brand .b-name, .wide-only { display: none; }
   .proj { order: 1; flex: 1 1 0; }
-  .save { order: 2; margin-left: 0; }
+  .meta-r { order: 2; margin-left: 0; }
   .save:not(.err) .stxt { display: none; }
   .tools { order: 3; flex-basis: 100%; }
   .frontier { width: auto; right: max(12px, env(safe-area-inset-right, 0px)); max-height: 55%; }
@@ -388,7 +405,10 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
       </div>
       <button class="btn" id="dataBtn">Export<span class="wide-only">/ Import</span></button>
     </div>
-    <div class="save wait" id="saveState" role="status"><span class="sdot"></span><span class="stxt">Connecting…</span></div>
+    <div class="meta-r">
+      <button class="btn icon" id="soundBtn" aria-pressed="true" aria-label="Sound effects" title="Sound effects on"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-3.5v11L6 12H3z" fill="currentColor"/><path class="snd-on" d="M13 7.2a4 4 0 0 1 0 5.6M15.2 5a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path class="snd-off" d="M13.5 7.5l5 5M18.5 7.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+      <div class="save wait" id="saveState" role="status"><span class="sdot"></span><span class="stxt">Connecting…</span></div>
+    </div>
   </header>
   <main class="stage" id="stage">
     <div class="viewport" id="viewport">
@@ -443,8 +463,9 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
 const W = 236, H = 84, GAP = 64, COLW = W + GAP, ROWH = 104, PADX = 56, PADY = 52;
 const KMIN = 0.3, KMAX = 1.8;
 const STATUSES = ['todo', 'active', 'done', 'dropped'];
-// A task is work you finish. A route is a direction you explore: its follow-ups open while it is
-// being explored, and only adopting it (a route's "done") supersedes its alternatives.
+// A task is work you finish; a route is a direction you explore. Starting either opens its next layer.
+// A task completes itself once that whole layer is done; a route is only ever adopted by hand,
+// and adopting it (a route's "done") supersedes its alternatives.
 const STATUS_LABEL = {
   task: { todo: 'Not started', active: 'Researching', done: 'Done', dropped: 'Dropped' },
   route: { todo: 'Not explored', active: 'Exploring', done: 'Adopted', dropped: 'Abandoned' },
@@ -452,10 +473,10 @@ const STATUS_LABEL = {
 const DS_LABEL = { done: 'Done', active: 'Researching', available: 'Available', locked: 'Locked', superseded: 'Superseded', blocked: 'Cut off', dropped: 'Dropped' };
 const ROUTE_DS_LABEL = { done: 'Adopted', active: 'Exploring', available: 'Ready to explore', dropped: 'Abandoned' };
 const LEGEND_LABEL = { done: 'Done / adopted', active: 'Researching / exploring', dropped: 'Dropped / abandoned' };
-const ROUTE_HELP = 'A task is work you finish. A route is a direction you explore: its follow-ups open while you explore it, and only adopting it supersedes its alternatives.';
+const ROUTE_HELP = 'A task is work you finish: starting it opens its next layer, and it completes itself once that layer is done. A route is a direction you explore: only adopting it, by hand, supersedes its alternatives.';
 const isRoute = n => !!n && n.type === 'route';
 const dsLabel = (ds, n) => (isRoute(n) && ROUTE_DS_LABEL[ds]) || DS_LABEL[ds];
-const satisfies = n => n.status === 'done' || (n.type === 'route' && n.status === 'active');
+const satisfies = n => n.status === 'done' || n.status === 'active';
 const DS_ORDER = ['done', 'active', 'available', 'locked', 'superseded', 'blocked', 'dropped'];
 const KINDS = ['Model', 'Calibration', 'Data', 'Estimation', 'Robustness', 'Writing', 'Other'];
 const DATA_KEY = 'research-tech-tree:data:v1';
@@ -522,6 +543,7 @@ function normNode(id, r, i) {
     status: STATUSES.includes(r.status) ? r.status : 'todo',
     kind: KINDS.includes(r.kind) ? r.kind : 'Other',
     type: r.type === 'route' ? 'route' : 'task',
+    autoDone: r.autoDone === true && r.status === 'done',   // completed by its next layer, not by hand
     effort: Number.isFinite(eff) && eff >= 0 ? eff : null,
     progress: clamp(Math.round(Number(r.progress) || 0), 0, 100),
     prereqs: Array.isArray(r.prereqs) ? r.prereqs.filter(x => typeof x === 'string') : [],
@@ -696,6 +718,13 @@ function computeLayout(p) {
   };
 }
 
+// The next layer of a task, which its ring and auto-completion follow. Dropped, superseded and
+// cut-off ideas do not count toward the load.
+function subOf(p, id, lay = L, der = D) {
+  const kids = (lay.children[id] || []).filter(c => der[c] !== 'dropped' && der[c] !== 'superseded' && der[c] !== 'blocked');
+  return { total: kids.length, done: kids.filter(c => p.nodes[c].status === 'done').length };
+}
+
 // ---------- the example tree (opened the first time the local file runs)
 function exampleProject() {
   const t = nowISO();
@@ -832,6 +861,7 @@ function undo() {
   scheduleSave(p.id);
   render();
   renderInspector();
+  toast('Undone');
 }
 function makeNode(props) {
   const t = nowISO();
@@ -888,19 +918,72 @@ function deleteNode(id) {
   if (state.sel === id) { state.sel = null; render(); renderInspector(); }
   toast(`Deleted “${trunc(n.title, 40)}”`, { action: 'Undo', onAction: undo });
 }
+let fx = {};   // one-shot animation classes for the next canvas render
+// Walk up from the given parents: a task whose whole next layer is done completes itself, and one that
+// completed that way reopens when part of its layer reopens. Routes are left for the user to adopt.
+function rollUp(p, parentIds) {
+  const done = [], reopened = [], seen = new Set(), queue = [...parentIds];
+  while (queue.length) {
+    const pid = queue.shift();
+    if (seen.has(pid)) continue;
+    seen.add(pid);
+    const par = p.nodes[pid];
+    if (!par || isRoute(par) || par.status === 'dropped') continue;
+    const der = computeDerived(p);
+    const kids = Object.values(p.nodes).filter(m => m.prereqs.includes(pid) && der[m.id] !== 'dropped' && der[m.id] !== 'superseded' && der[m.id] !== 'blocked');
+    const all = kids.length > 0 && kids.every(m => m.status === 'done');
+    if (all && par.status !== 'done') { par.status = 'done'; par.autoDone = true; done.push(pid); }
+    else if (!all && par.status === 'done' && par.autoDone) { par.status = 'active'; par.autoDone = false; reopened.push(pid); }
+    else continue;
+    par.updated = nowISO();
+    queue.push(...par.prereqs);
+  }
+  return { done, reopened };
+}
 function setStatus(id, s) {
   const p = cur();
-  if (!p || !p.nodes[id] || p.nodes[id].status === s) return;
-  const was = { ...D };
-  mutate(p => { const n = p.nodes[id]; n.status = s; n.updated = nowISO(); }, { insp: true });
+  if (!p || !p.nodes[id] || p.nodes[id].status === s || state.readOnly) return;
+  const was = { ...D }, route = isRoute(p.nodes[id]);
+  let roll = { done: [], reopened: [] };
+  mutate(p => {
+    const n = p.nodes[id];
+    n.status = s;
+    n.autoDone = false;
+    n.updated = nowISO();
+    roll = rollUp(p, n.prereqs);
+  }, { insp: true });
   const N = cur().nodes;
   const names = ids => { const a = ids.map(k => `“${trunc(N[k].title, 30)}”`); return a.slice(0, 3).join(', ') + (a.length > 3 ? ` and ${a.length - 3} more` : ''); };
-  const changedTo = st => Object.keys(D).filter(k => k !== id && D[k] === st && was[k] !== st);
+  const changedTo = st => Object.keys(D).filter(k => k !== id && D[k] === st && was[k] !== st && !roll.done.includes(k));
   const opened = changedTo('available'), sup = changedTo('superseded');
+
+  if (s === 'done') fx[id] = 'fx-done';
+  for (const q of N[id].prereqs) if (N[q] && !isRoute(N[q]) && N[q].status === 'active') fx[q] = 'fx-tick';
+  roll.reopened.forEach(k => { fx[k] = 'fx-tick'; });
+  roll.done.forEach(k => { fx[k] = 'fx-cascade'; });
+  opened.forEach(k => { fx[k] = fx[k] || 'fx-unlock'; });
+  render();
+  if (roll.done.length) play('complete');
+  else if (s === 'done') play(route ? 'adopt' : 'done');
+
   const msg = [];
+  if (roll.done.length) msg.push(`Completed ${names(roll.done)}, because ${roll.done.length > 1 ? 'their next layers are' : 'its next layer is'} all done.`);
+  if (roll.reopened.length) msg.push(`Reopened ${names(roll.reopened)}, since part of ${roll.reopened.length > 1 ? 'their' : 'its'} next layer is open again.`);
   if (opened.length) msg.push(`Unlocked ${names(opened)}.`);
   if (sup.length) msg.push(`Superseded ${names(sup)}.`);
-  if (msg.length) toast(msg.join(' '));
+  // A route whose tasks are all finished is ready for a decision: offer it, never make it.
+  let nudge = null;
+  if (s === 'done' && !route) {
+    nudge = [...ancestors(cur(), id)].find(k => {
+      if (!isRoute(N[k]) || N[k].status !== 'active') return false;
+      const t = tally(cur(), k);
+      return t.total > 0 && t.done === t.total;
+    }) || null;
+  }
+  if (nudge) {
+    msg.push(`Every task under “${trunc(N[nudge].title, 30)}” is done.`);
+    toast(msg.join(' '), { action: 'Adopt route', onAction: () => setStatus(nudge, 'done') });
+  } else if (msg.length) toast(msg.join(' '));
 }
 function setType(id, type) {
   const p = cur();
@@ -1033,11 +1116,16 @@ function route(x1, y1, x2, y2) {
   const r = Math.min(12, Math.abs(y2 - y1) / 2, Math.max(0, xm - x1));
   return `M${x1} ${y1}H${xm - r}Q${xm} ${y1} ${xm} ${y1 + s * r}V${y2 - s * r}Q${xm} ${y2} ${xm + r} ${y2}H${x2}`;
 }
-function medal(ds, prog) {
+function medal(ds, prog, sub) {
   const C = 2 * Math.PI * 15, o = '<svg viewBox="0 0 40 40" aria-hidden="true">';
   switch (ds) {
     case 'done': return o + '<circle cx="20" cy="20" r="17" class="m-done"/><path d="M12.5 20.5l5 5 10-11" class="m-check" fill="none"/></svg>';
-    case 'active': return o + `<circle cx="20" cy="20" r="15" class="m-track" fill="none"/><circle cx="20" cy="20" r="15" class="m-prog" fill="none" stroke-dasharray="${(C * prog / 100).toFixed(2)} ${C.toFixed(2)}" transform="rotate(-90 20 20)"/><text x="20" y="23.5" class="m-pct">${prog}</text></svg>`;
+    case 'active': {
+      // A task with a next layer fills by the share of it done; a leaf task by its own progress.
+      const frac = sub && sub.total ? sub.done / sub.total : prog / 100;
+      const label = sub && sub.total ? `${sub.done}/${sub.total}` : String(prog);
+      return o + `<circle cx="20" cy="20" r="15" class="m-track" fill="none"/><circle cx="20" cy="20" r="15" class="m-prog" fill="none" stroke-dasharray="${(C * frac).toFixed(2)} ${C.toFixed(2)}" transform="rotate(-90 20 20)"/><text x="20" y="23.5" class="m-pct${label.length > 3 ? ' sm' : ''}">${label}</text></svg>`;
+    }
     case 'available': return o + '<circle cx="20" cy="20" r="15" class="m-ring-avail" fill="none"/><circle cx="20" cy="20" r="5.5" class="m-dot-avail"/></svg>';
     case 'locked': return o + '<circle cx="20" cy="20" r="16" class="m-lockbg"/><path d="M16 19.5v-2.5a4 4 0 0 1 8 0v2.5" class="m-shackle" fill="none"/><rect x="13.5" y="19" width="13" height="9.5" rx="2" class="m-lock"/></svg>';
     case 'dropped': return o + '<circle cx="20" cy="20" r="15" class="m-ring-drop" fill="none"/><path d="M14.5 14.5l11 11M25.5 14.5l-11 11" class="m-x" fill="none"/></svg>';
@@ -1059,6 +1147,8 @@ function routeMedal(ds, t) {
 }
 function renderWorld(p) {
   const N = p.nodes, nodes = sortedNodes(p);
+  const fxNow = fx;
+  fx = {};
   el.world.style.width = L.width + 'px';
   el.world.style.height = L.height + 'px';
   let bands = '';
@@ -1102,8 +1192,8 @@ function renderWorld(p) {
       if (n.effort != null) meta.push(`<span title="Estimated effort">~${fmtEff(n.effort)}</span>`);
     }
     if (unl) meta.push(`<span title="Unlocks ${unl} idea${unl > 1 ? 's' : ''}">&rarr;&thinsp;${unl}</span>`);
-    html += `<div class="node${route ? ' route' : ''} s-${ds}${n.id === sel ? ' sel' : ''}${anc.has(n.id) ? ' anc' : ''}" data-id="${esc(n.id)}" style="left:${pos.x}px;top:${pos.y}px" tabindex="0" role="button" title="${esc(n.title)}" aria-label="${esc(n.title)}: ${route ? 'route, ' : ''}${dsLabel(ds, n)}">`
-      + `<div class="medal">${route ? routeMedal(ds, t) : medal(ds, n.progress)}</div>`
+    html += `<div class="node${route ? ' route' : ''}${fxNow[n.id] ? ' ' + fxNow[n.id] : ''} s-${ds}${n.id === sel ? ' sel' : ''}${anc.has(n.id) ? ' anc' : ''}" data-id="${esc(n.id)}" style="left:${pos.x}px;top:${pos.y}px" tabindex="0" role="button" title="${esc(n.title)}" aria-label="${esc(n.title)}: ${route ? 'route, ' : ''}${dsLabel(ds, n)}">`
+      + `<div class="medal">${route ? routeMedal(ds, t) : medal(ds, n.progress, subOf(p, n.id))}</div>`
       + `<div class="nbody"><div class="ntitle">${esc(n.title || 'Untitled idea')}</div><div class="nmeta">${meta.join('')}</div></div>`
       + (state.readOnly ? '' : `<span class="port" data-port="${esc(n.id)}" title="Drag onto a later idea to make this its prerequisite"></span>`)
       + '</div>';
@@ -1150,7 +1240,9 @@ function renderFrontier() {
   const bar = DS_ORDER.filter(s => counts[s]).map(s => `<span class="seg-${s}" style="flex:${counts[s]}" title="${LEGEND_LABEL[s] || DS_LABEL[s]}: ${counts[s]}"></span>`).join('');
   const side = n => {
     if (isRoute(n)) { const t = tally(p, n.id); return t.total ? `${t.done}/${t.total}` : ''; }
-    return D[n.id] === 'active' ? n.progress + '%' : n.effort != null ? '~' + fmtEff(n.effort) : '';
+    const sb = subOf(p, n.id);
+    if (D[n.id] === 'active') return sb.total ? `${sb.done}/${sb.total}` : n.progress + '%';
+    return n.effort != null ? '~' + fmtEff(n.effort) : '';
   };
   const item = n => `<button class="fr-item" data-goto="${esc(n.id)}"><i class="dot s-${D[n.id]}${isRoute(n) ? ' route' : ''}"></i><span class="fr-t">${esc(n.title || 'Untitled idea')}</span><span class="fr-m"${isRoute(n) ? ' title="Tasks done under this route"' : ''}>${side(n)}</span></button>`;
   const body = el.frontier.querySelector('.fr-body');
@@ -1160,7 +1252,7 @@ function renderFrontier() {
     + `<div class="fr-summary"><div class="fr-bar">${bar}</div><div class="fr-stats"><span class="num">${doneTasks}</span> of <span class="num">${tasks.length}</span> tasks done${routesOpen.length ? ` · <span class="num">${routesOpen.length}</span> route${routesOpen.length > 1 ? 's' : ''} open` : ''}${dropped ? ` · <span class="num">${dropped}</span> dropped` : ''}</div></div>`
     + (routesOpen.length ? `<h3 class="fr-h">Open routes</h3>${routesOpen.map(item).join('')}` : '')
     + `<h3 class="fr-h">Researching</h3>${act.length ? act.map(item).join('') : '<p class="fr-none">Nothing in progress. Start one of the available ideas.</p>'}`
-    + `<h3 class="fr-h">Available</h3>${av.length ? av.map(item).join('') : '<p class="fr-none">Nothing is unlocked right now. Finish a task or start exploring a route to open the next ideas.</p>'}`
+    + `<h3 class="fr-h">Available</h3>${av.length ? av.map(item).join('') : '<p class="fr-none">Nothing is unlocked right now. Start a task or explore a route to open the ideas after it.</p>'}`
     + `<div class="legend">${DS_ORDER.map(s => `<span><i class="dot s-${s}"></i>${LEGEND_LABEL[s] || DS_LABEL[s]}</span>`).join('')}<span><i class="dot shape"></i>Task</span><span><i class="dot shape route"></i>Route</span></div>`
     + '<p class="keys edit-only"><kbd>N</kbd> task · <kbd>R</kbd> route · <kbd>P</kbd> parallel · <kbd>F</kbd> fit · <kbd>Del</kbd> delete · <kbd>Ctrl Z</kbd> undo. Drag the dot on a card\'s right edge onto another card to link them.</p>'
     + '</div>';
@@ -1174,16 +1266,16 @@ function why(p, n, ds) {
   switch (ds) {
     case 'done':
       if (route) return `Adopted.${n.alts.length ? ' Its alternatives are superseded.' : ''}${n.findings ? '' : ' Record why under Evidence.'}`;
-      return n.findings ? 'Done.' : 'Done. Note what you learned under Findings.';
+      return (n.autoDone ? 'Done automatically, because its whole next layer is finished.' : 'Done.') + (n.findings ? '' : ' Note what you learned under Findings.');
     case 'active':
       if (route) return `Exploring, so its follow-ups are open. Mark it Adopted once the evidence favors it${n.alts.length ? '; that supersedes its alternatives' : ''}.`;
-      return `In progress, ${n.progress}% along.`;
+      { const sub = subOf(p, n.id); return sub.total ? `In progress. Its next layer is open, and it completes itself once all ${sub.total} are done.` : `In progress, ${n.progress}% along.`; }
     case 'available':
       if (route) return n.prereqs.length ? 'All prerequisites are met. Set it to Exploring to open its follow-ups.' : 'A starting route. Set it to Exploring to open its follow-ups.';
       return n.prereqs.length ? 'All prerequisites are met. Ready to start.' : 'A starting point with no prerequisites. Ready to start.';
     case 'locked': {
       const w = n.prereqs.filter(id => !satisfies(N[id]));
-      return `Locked. Waiting for ${joinAnd(w.map(id => q(id) + (isRoute(N[id]) ? ' to be explored' : ' to be done')))}.`;
+      return `Locked. Waiting for ${joinAnd(w.map(id => q(id) + (isRoute(N[id]) ? ' to be explored' : ' to be started')))}.`;
     }
     case 'superseded': {
       const w = n.alts.filter(a => N[a].status === 'done');
@@ -1209,6 +1301,14 @@ function pathInfo(p, n) {
     + (dead ? '<p class="warn">The way there runs through a dropped idea.</p>' : '')
     + (open.length ? '<p class="hint">The blue lines on the tree trace it.</p>' : '')
     + '</div>';
+}
+function subBox(n, sub) {
+  if (!sub.total) return '';
+  const left = sub.total - sub.done;
+  const tail = n.status === 'done'
+    ? (n.autoDone ? ' · it was marked done when the last one finished' : '')
+    : n.status === 'dropped' || !left ? '' : ` · it completes itself once the remaining ${left === 1 ? 'one is' : left + ' are'} done`;
+  return `<div class="routebox subbox"><span class="lbl">Next layer</span><p><b class="num">${sub.done}</b> of <b class="num">${sub.total}</b> done${tail}</p></div>`;
 }
 function routeBox(p, n) {
   const t = tally(p, n.id);
@@ -1239,7 +1339,7 @@ function renderInspector() {
   const n = p && state.sel ? p.nodes[state.sel] : null;
   if (!n || !L) { el.insp.hidden = true; el.insp.innerHTML = ''; return; }
   const N = p.nodes, ds = D[n.id] || 'locked', ro = state.readOnly ? ' disabled' : '';
-  const route = isRoute(n), type = route ? 'route' : 'task';
+  const route = isRoute(n), type = route ? 'route' : 'task', sub = subOf(p, n.id);
   const chip = (id, rm) => `<span class="chip"><i class="dot s-${D[id]}${isRoute(N[id]) ? ' route' : ''}"></i><button class="chip-t" data-act="goto" data-id="${esc(id)}" title="${esc(N[id].title)}">${esc(trunc(N[id].title || 'Untitled idea', 38))}</button>${rm && !state.readOnly ? `<button class="chip-x" data-act="${rm}" data-id="${esc(id)}" aria-label="Remove ${esc(N[id].title)}">&times;</button>` : ''}</span>`;
   const list = (ids, rm, none) => ids.length ? `<div class="chips">${ids.map(id => chip(id, rm)).join('')}</div>` : `<p class="none">${none}</p>`;
   const bySeq = ids => ids.slice().sort((a, b) => N[a].seq - N[b].seq);
@@ -1253,8 +1353,8 @@ function renderInspector() {
     + `<label class="sr" for="f-title">Title</label><textarea id="f-title" class="i-title" data-f="title" rows="2" maxlength="200" placeholder="${route ? 'Name this route' : 'Name this idea'}"${ro}>${esc(n.title)}</textarea>`
     + `<div class="seg" role="group" aria-label="Status">${STATUSES.map(s => `<button data-status="${s}" class="${n.status === s ? 'on' : ''}" aria-pressed="${n.status === s}"${ro}>${STATUS_LABEL[type][s]}</button>`).join('')}</div>`
     + `<p class="why">${why(p, n, ds)}</p>`
-    + (!route && n.status === 'active' ? `<div class="field"><label class="lbl" for="f-prog">Progress <span class="num" id="progVal">${n.progress}%</span></label><input id="f-prog" type="range" min="0" max="100" step="5" value="${n.progress}" data-f="progress"${ro}></div>` : '')
-    + (route ? routeBox(p, n) : '')
+    + (!route && n.status === 'active' && !sub.total ? `<div class="field"><label class="lbl" for="f-prog">Progress <span class="num" id="progVal">${n.progress}%</span></label><input id="f-prog" type="range" min="0" max="100" step="5" value="${n.progress}" data-f="progress"${ro}></div>` : '')
+    + (route ? routeBox(p, n) : subBox(n, sub))
     + `<div class="row2"><div class="field"><label class="lbl" for="f-kind">Kind</label><select id="f-kind" data-f="kind"${ro}>${KINDS.map(k => `<option${k === n.kind ? ' selected' : ''}>${k}</option>`).join('')}</select></div>`
     + (route ? '' : `<div class="field"><label class="lbl" for="f-eff">Effort, days</label><input id="f-eff" class="num" type="number" min="0" step="0.5" inputmode="decimal" data-f="effort" placeholder="Not estimated" value="${n.effort == null ? '' : n.effort}"${ro}></div>`)
     + '</div>'
@@ -1584,7 +1684,11 @@ function outline(p) {
     const n = N[id], pad = '  '.repeat(depth), tags = [];
     if (der[id] !== 'done') tags.push(dsLabel(der[id], n).toLowerCase() + (n.status === 'active' && !isRoute(n) ? ` ${n.progress}%` : ''));
     if (isRoute(n)) { const t = tally(p, id, lay, der); if (t.total) tags.push(`${t.done}/${t.total} tasks done`); }
-    else if (n.effort != null) tags.push('~' + fmtEff(n.effort));
+    else {
+      const sb = subOf(p, id, lay, der);
+      if (sb.total && n.status !== 'done') tags.push(`${sb.done}/${sb.total} of next layer done`);
+      if (n.effort != null) tags.push('~' + fmtEff(n.effort));
+    }
     const extra = n.prereqs.filter(q => q !== lay.parent[id]);
     if (extra.length) tags.push('also needs: ' + extra.map(q => N[q].title).join('; '));
     if (n.alts.length) tags.push('alternative to: ' + n.alts.map(a => N[a].title).join('; '));
@@ -1695,6 +1799,54 @@ function toast(msg, opt = {}) {
   toastT = setTimeout(() => { el.toast.hidden = true; }, opt.action ? 6500 : 3000);
   if (opt.action) el.toast.querySelector('button').onclick = () => { el.toast.hidden = true; opt.onAction(); };
 }
+
+// Sound: short chimes synthesized on the spot (no audio files), only ever in response to a click.
+let actx = null, master = null;
+const soundOn = () => prefs.sound !== false;
+const CUES = {
+  done: [[783.99, 0], [1046.5, 0.09]],                                   // G5 then C6
+  complete: [[523.25, 0], [659.25, 0.08], [783.99, 0.16], [1046.5, 0.26]], // C major arpeggio
+  adopt: [[392, 0], [587.33, 0.1], [783.99, 0.2]],                       // G4 D5 G5, an open fifth
+};
+function bell(freq, at, dur, vol) {
+  // A sine fundamental plus two quickly fading inharmonic partials reads as a small bell.
+  for (const [mult, g] of [[1, 1], [2.76, 0.25], [5.4, 0.07]]) {
+    const o = actx.createOscillator(), e = actx.createGain(), end = at + dur / (mult > 1 ? mult * 0.6 : 1);
+    o.type = 'sine';
+    o.frequency.value = freq * mult;
+    e.gain.setValueAtTime(0.0001, at);
+    e.gain.exponentialRampToValueAtTime(vol * g, at + 0.008);
+    e.gain.exponentialRampToValueAtTime(0.0001, end);
+    o.connect(e);
+    e.connect(master);
+    o.start(at);
+    o.stop(end + 0.05);
+  }
+}
+function play(cue) {
+  if (!soundOn() || !CUES[cue]) return;
+  try {
+    if (!actx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      actx = new AC();
+      master = actx.createGain();
+      master.gain.value = 0.22;
+      master.connect(actx.destination);
+    }
+    if (actx.state === 'suspended') actx.resume();
+    const t0 = actx.currentTime + 0.02, notes = CUES[cue];
+    notes.forEach(([f, d], i) => bell(f, t0 + d, i === notes.length - 1 ? 1.1 : 0.55, 0.5));
+  } catch (e) { /* no audio in this view */ }
+}
+const soundBtn = $('soundBtn');
+function renderSoundBtn() {
+  const on = soundOn();
+  soundBtn.setAttribute('aria-pressed', String(on));
+  soundBtn.title = on ? 'Sound effects on' : 'Sound effects off';
+}
+soundBtn.addEventListener('click', () => { prefs.sound = !soundOn(); savePrefs(); renderSoundBtn(); play('done'); });
+renderSoundBtn();
 
 // Keyboard shortcuts
 document.addEventListener('keydown', e => {
