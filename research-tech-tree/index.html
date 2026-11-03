@@ -1443,7 +1443,7 @@ function toWorld(cx, cy) {
   return { x: (cx - r.left - view.x) / view.k, y: (cy - r.top - view.y) / view.k };
 }
 
-// ---------- canvas gestures: drag to pan, pinch or Ctrl+wheel to zoom, tap to select
+// ---------- canvas gestures: drag to pan, wheel or pinch to zoom, tap to select
 const ptrs = new Map();
 let gesture = null;
 el.viewport.addEventListener('pointerdown', e => {
@@ -1502,8 +1502,11 @@ let wheelT = 0;
 el.viewport.addEventListener('wheel', e => {
   e.preventDefault();
   const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
-  if (e.ctrlKey || e.metaKey) zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * unit * 0.01));
-  else { view.x -= e.deltaX * unit; view.y -= e.deltaY * unit; applyView(); }
+  // The wheel zooms around the cursor (pinch arrives as Ctrl+wheel with finer deltas); a sideways
+  // swipe still pans, and dragging the canvas pans in any direction.
+  const dy = e.deltaY * unit;
+  if (dy) zoomAt(e.clientX, e.clientY, Math.exp(-clamp(dy, -120, 120) * (e.ctrlKey ? 0.01 : 0.0015)));
+  if (e.deltaX && !e.ctrlKey) { view.x -= e.deltaX * unit; applyView(); }
   clearTimeout(wheelT);
   wheelT = setTimeout(rememberView, 250);
 }, { passive: false });
