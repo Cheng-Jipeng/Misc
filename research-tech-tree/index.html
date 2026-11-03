@@ -34,6 +34,7 @@
   --route-soft: #ECE5F5;
   --glow: rgba(148, 101, 16, .5);
   --glow-avail: rgba(24, 120, 91, .42);
+  --recede: .5;   /* how much of the tech tree shows behind an open card */
   --shadow: rgba(21, 33, 46, .12);
   --scrim: rgba(21, 33, 46, .38);
   --font-display: "Marcellus SC", "Iowan Old Style", Georgia, serif;
@@ -46,7 +47,7 @@
     --ink: #E4EAF1; --muted: #93A3B4; --line: #2C3B4D; --line-strong: #50647B;
     --accent: #DAAA48; --accent-soft: #3A2F16; --done-bg: #221E14;
     --active: #6FA5FF; --active-soft: #1B2E4C; --avail: #48C795; --avail-soft: #14352A;
-    --drop: #E07D72; --drop-soft: #3B201D; --route: #B9A0EC; --route-soft: #2B2342; --glow: rgba(218, 170, 72, .55); --glow-avail: rgba(72, 199, 149, .45); --shadow: rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
+    --drop: #E07D72; --drop-soft: #3B201D; --route: #B9A0EC; --route-soft: #2B2342; --glow: rgba(218, 170, 72, .55); --glow-avail: rgba(72, 199, 149, .45); --recede: .72; --shadow: rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
     color-scheme: dark;
   }
 }
@@ -55,7 +56,7 @@
   --ink: #E4EAF1; --muted: #93A3B4; --line: #2C3B4D; --line-strong: #50647B;
   --accent: #DAAA48; --accent-soft: #3A2F16; --done-bg: #221E14;
   --active: #6FA5FF; --active-soft: #1B2E4C; --avail: #48C795; --avail-soft: #14352A;
-  --drop: #E07D72; --drop-soft: #3B201D; --route: #B9A0EC; --route-soft: #2B2342; --glow: rgba(218, 170, 72, .55); --glow-avail: rgba(72, 199, 149, .45); --shadow: rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
+  --drop: #E07D72; --drop-soft: #3B201D; --route: #B9A0EC; --route-soft: #2B2342; --glow: rgba(218, 170, 72, .55); --glow-avail: rgba(72, 199, 149, .45); --recede: .72; --shadow: rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
   color-scheme: dark;
 }
 
@@ -328,22 +329,72 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
 .type-seg button[data-type="route"].on { background: var(--route); }
 .routebox { display: grid; gap: 4px; padding: 10px 12px; border-radius: 8px; background: var(--route-soft); }
 .routebox p { margin: 0; font-size: 13px; }
-.cklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.ck-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 4px 6px; padding: 2px 4px; border-radius: 6px; }
-.ck-item:hover { background: var(--surface-2); }
-.ck-item input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
-.ck-text { min-width: 0; padding: 4px 6px; border: 1px solid transparent; border-radius: 5px; background: transparent; font-size: 13px; }
-.ck-text:hover:not(:disabled) { border-color: var(--line); }
-.ck-text:focus { border-color: var(--active); background: var(--surface); outline: none; }
-.ck-item.done .ck-text { color: var(--muted); text-decoration: line-through; }
-.ck-btn { width: 24px; height: 24px; border: 0; border-radius: 5px; background: none; color: var(--muted); font-size: 14px; line-height: 1; opacity: 0; }
-.ck-item:hover .ck-btn, .ck-item:focus-within .ck-btn { opacity: 1; }
-@media (hover: none) { .ck-btn { opacity: 1; } }
-.ck-btn:hover { background: var(--surface-2); color: var(--ink); }
-.ck-btn[data-ck="del"]:hover { background: var(--drop-soft); color: var(--drop); }
-.ck-note { grid-column: 2 / -1; margin: 0 0 2px 6px; font-size: 11.5px; color: var(--muted); }
 .ck-new { width: 100%; font-size: 13px; }
 .ck .btn.sm { justify-self: start; }
+.tt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.tt-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border: 1px solid transparent; border-radius: 7px; background: var(--surface-2); text-align: left; font-size: 13px; }
+.tt-row:hover { border-color: var(--line-strong); }
+.tt-row .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-row.done .t { color: var(--muted); text-decoration: line-through; }
+.tt-row .m { font: 500 11px/1 var(--font-mono); color: var(--muted); }
+.ck .btn.primary { justify-self: start; }
+
+/* ---------- inner layer: a task tree opened out of a tech card, with the tech tree receding behind it */
+.world { transition: opacity .5s ease, filter .5s ease; }
+.world.morph { transition: transform .6s cubic-bezier(.2, .7, .2, 1), opacity .5s ease, filter .5s ease; }
+.world.receded { opacity: var(--recede); filter: blur(2.4px) saturate(.6); pointer-events: none; }
+.world .node.portal { opacity: 0; transition: opacity .3s ease; }
+.vignette {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .55s ease;
+  background: radial-gradient(ellipse 64% 60% at 50% 52%, color-mix(in srgb, var(--bg) 96%, transparent) 28%, color-mix(in srgb, var(--bg) 62%, transparent) 64%, transparent 100%);
+}
+.vignette.on { opacity: 1; }
+.iworld { position: absolute; left: 0; top: 0; transform-origin: 0 0; opacity: 0; pointer-events: none; transition: opacity .35s ease; }
+.iworld.on { opacity: 1; pointer-events: auto; }
+.iworld.morph { transition: transform .55s cubic-bezier(.2, .7, .2, 1), opacity .4s ease; }
+.iedge { stroke-width: 1.6; }
+.inode {
+  position: absolute; width: 220px; height: 66px; display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px 8px 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 2px 10px var(--shadow); cursor: pointer;
+}
+.inode:focus-visible { outline: 2px solid var(--active); outline-offset: 3px; }
+.inode.sel { outline: 2px solid var(--ink); outline-offset: 3px; }
+.inode.s-done { background: var(--done-bg); border-color: var(--accent); }
+.inode.s-active { border-color: var(--active); }
+.inode.s-dropped { opacity: .55; }
+.inode.s-dropped .ntitle { text-decoration: line-through; }
+.inode .ntitle { font-size: 13px; }
+.inode .nmeta { margin-top: 4px; }
+.imedal { flex: none; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.imedal svg { display: block; width: 34px; height: 34px; }
+.imedal:disabled { cursor: default; }
+.i-ring { stroke: var(--line-strong); stroke-width: 2; }
+.i-hint { stroke: var(--accent); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transition: opacity .15s ease; }
+.imedal:hover:not(:disabled) .i-hint { opacity: .7; }
+.i-dot { fill: var(--active); }
+.inode.iroot {
+  width: 264px; height: 100px; padding: 12px 16px 12px 12px; border-width: 2px; border-radius: 14px;
+  box-shadow: 0 0 0 6px var(--accent-soft), 0 14px 40px var(--shadow);
+}
+.inode.iroot.route { border-radius: 10px 50px 50px 10px; padding-right: 30px; box-shadow: 0 0 0 6px var(--route-soft), 0 14px 40px var(--shadow); }
+.inode.iroot.s-done { background: var(--done-bg); border-color: var(--accent); }
+.inode.iroot.s-active { border-color: var(--active); }
+.inode.iroot.s-available { border-color: var(--avail); }
+.inode.iroot .ntitle { font-size: 15px; }
+.ikicker { margin-bottom: 4px; font: 11px/1 var(--font-display); letter-spacing: .16em; color: var(--muted); }
+.inode.fx-done { animation: fx-burst .8s ease-out; }
+.inode.fx-cascade { animation: fx-burst .9s ease-out .3s backwards; }
+.inode.fx-unlock { animation: fx-open 1s ease-out .1s backwards; }
+.inode.fx-done .imedal, .inode.fx-tick .imedal { animation: fx-pop .5s cubic-bezier(.3, 1.5, .5, 1); }
+.inode.fx-cascade .imedal, .inode.fx-cascade .medal { animation: fx-pop .5s cubic-bezier(.3, 1.5, .5, 1) .3s backwards; }
+.crumb {
+  position: absolute; z-index: 3; top: 12px; left: max(12px, env(safe-area-inset-left, 0px)); max-width: calc(100% - 24px);
+  display: flex; align-items: center; gap: 10px; padding: 6px 14px 6px 6px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 22px var(--shadow);
+}
+.crumb-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 15px/1.2 var(--font-display); letter-spacing: .04em; }
+.crumb-prog { font: 600 12px/1 var(--font-mono); color: var(--muted); }
 .cmp-wrap { overflow-x: auto; }
 .cmp { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .cmp th { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); font: 600 10px/1.3 var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
@@ -384,6 +435,7 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
 .ro .edit-only { display: none !important; }
 
 @media (max-width: 720px) {
+  .vignette { background: radial-gradient(ellipse 92% 34% at 50% 52%, color-mix(in srgb, var(--bg) 96%, transparent) 30%, color-mix(in srgb, var(--bg) 60%, transparent) 70%, transparent 100%); }
   .brand .b-name, .wide-only { display: none; }
   .proj { order: 1; flex: 1 1 0; }
   .meta-r { order: 2; margin-left: 0; }
@@ -441,8 +493,15 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
         <svg id="edges" class="edges" xmlns="http://www.w3.org/2000/svg"></svg>
         <div id="nodes"></div>
       </div>
+      <div class="vignette" id="vignette"></div>
+      <div class="iworld" id="iworld"><svg id="iedges" class="edges" xmlns="http://www.w3.org/2000/svg"></svg><div id="inodes"></div></div>
     </div>
     <div class="tierbar" id="tierbar" aria-hidden="true"></div>
+    <nav class="crumb" id="crumb" aria-label="Where you are" hidden>
+      <button class="btn sm" id="crumbBack" title="Back to the tech tree (Esc)">&larr; Tech tree</button>
+      <span class="crumb-title" id="crumbTitle"></span>
+      <span class="crumb-prog num" id="crumbProg"></span>
+    </nav>
     <aside class="frontier" id="frontier" aria-label="Frontier" hidden></aside>
     <aside class="inspector" id="insp" aria-label="Idea details" hidden></aside>
     <div class="empty" id="empty" hidden></div>
@@ -487,10 +546,10 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
 const W = 236, H = 84, GAP = 64, COLW = W + GAP, ROWH = 104, PADX = 56, PADY = 52;
 const KMIN = 0.3, KMAX = 1.8;
 const STATUSES = ['todo', 'active', 'done', 'dropped'];
-// The tree is a tech tree: a line means "this must be done before that". A task is a step: what
-// follows it unlocks once it is done, and its checklist holds the work inside it, completing it when
-// every item is ticked. A route is one of several competing directions: exploring it opens its
-// branch, and only adopting it (a route's "done"), by hand, supersedes the others.
+// Two layers. The outer one is a tech tree: a line means "this must be done before that". A task is a
+// step whose followers unlock once it is done; a route is one of several competing directions, whose
+// branch opens while it is explored and which only adopting it (a route's "done"), by hand, settles.
+// Opening a card shows the inner layer, a task tree of the work inside it (see "the inner layer").
 const STATUS_LABEL = {
   task: { todo: 'Not started', active: 'Researching', done: 'Done', dropped: 'Dropped' },
   route: { todo: 'Not explored', active: 'Exploring', done: 'Adopted', dropped: 'Abandoned' },
@@ -498,7 +557,8 @@ const STATUS_LABEL = {
 const DS_LABEL = { done: 'Done', active: 'Researching', available: 'Available', locked: 'Locked', superseded: 'Superseded', blocked: 'Cut off', dropped: 'Dropped' };
 const ROUTE_DS_LABEL = { done: 'Adopted', active: 'Exploring', available: 'Ready to explore', dropped: 'Abandoned' };
 const LEGEND_LABEL = { done: 'Done / adopted', active: 'Researching / exploring', dropped: 'Dropped / abandoned' };
-const ROUTE_HELP = 'A task is a step: what follows it unlocks once it is done, and its checklist holds the work inside it. A route is one of several competing directions: exploring it opens its branch, and adopting it supersedes the others.';
+const ROUTE_HELP = 'A task is a step: what follows it unlocks once it is done, and double-clicking it opens the task tree of work inside it. A route is one of several competing directions: exploring it opens its branch, and adopting it supersedes the others.';
+const ISTATUS_LABEL = { todo: 'Not started', active: 'In progress', done: 'Done', dropped: 'Dropped' };
 const isRoute = n => !!n && n.type === 'route';
 const dsLabel = (ds, n) => (isRoute(n) && ROUTE_DS_LABEL[ds]) || DS_LABEL[ds];
 const satisfies = n => n.status === 'done' || (n.type === 'route' && n.status === 'active');
@@ -515,6 +575,8 @@ const el = {
   tierbar: $('tierbar'), frontier: $('frontier'), insp: $('insp'), empty: $('empty'), projSel: $('projSel'), projMenuBtn: $('projMenuBtn'),
   projPop: $('projPop'), addBtn: $('addBtn'), undoBtn: $('undoBtn'), zIn: $('zIn'), zOut: $('zOut'), zFit: $('zFit'), dataBtn: $('dataBtn'),
   save: $('saveState'), toast: $('toast'), modal: $('dataModal'),
+  iworld: $('iworld'), iedges: $('iedges'), inodes: $('inodes'), vignette: $('vignette'),
+  crumb: $('crumb'), crumbBack: $('crumbBack'), crumbTitle: $('crumbTitle'), crumbProg: $('crumbProg'),
 };
 
 const state = { projects: {}, pid: null, sel: null, mode: 'loading', loaded: false, readOnly: false, storageOK: true, saveError: false };
@@ -554,7 +616,7 @@ function savePrefs() {
   prefT = setTimeout(() => { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch (e) { /* storage off */ } }, 300);
 }
 const frontierOpen = () => (typeof prefs.frontierOpen === 'boolean' ? prefs.frontierOpen : window.innerWidth > 720);
-function rememberView() { if (state.pid) { prefs.views[state.pid] = { x: Math.round(view.x), y: Math.round(view.y), k: +view.k.toFixed(3) }; savePrefs(); } }
+function rememberView() { if (state.pid && !state.inner) { prefs.views[state.pid] = { x: Math.round(view.x), y: Math.round(view.y), k: +view.k.toFixed(3) }; savePrefs(); } }
 
 // ---------- data model
 function normNode(id, r, i) {
@@ -574,16 +636,35 @@ function normNode(id, r, i) {
     progress: clamp(Math.round(Number(r.progress) || 0), 0, 100),
     prereqs: Array.isArray(r.prereqs) ? r.prereqs.filter(x => typeof x === 'string') : [],
     alts: Array.isArray(r.alts) ? r.alts.filter(x => typeof x === 'string') : [],
-    checklist: Array.isArray(r.checklist) ? r.checklist.filter(c => c && typeof c === 'object').map(c => ({
-      id: typeof c.id === 'string' && /^[\w-]{1,40}$/.test(c.id) ? c.id : uid('c'),
-      text: typeof c.text === 'string' ? c.text : '',
-      done: c.done === true,
-      note: typeof c.note === 'string' ? c.note : '',
-    })) : [],
+    subtasks: normSubtasks(r.subtasks || r.checklist),   // the card's task tree (older trees kept a flat checklist)
     seq: Number.isFinite(Number(r.seq)) && r.seq !== null && r.seq !== '' ? Number(r.seq) : i,
     created: typeof r.created === 'string' ? r.created : t,
     updated: typeof r.updated === 'string' ? r.updated : t,
   };
+}
+// Task-tree items: { id, text, status, parent (another item's id, or null for the top level), seq, note, autoDone }.
+function normSubtasks(raw) {
+  const list = (Array.isArray(raw) ? raw : []).filter(c => c && typeof c === 'object').map((c, i) => {
+    const status = STATUSES.includes(c.status) ? c.status : c.done === true ? 'done' : 'todo';
+    return {
+      id: typeof c.id === 'string' && /^[\w-]{1,40}$/.test(c.id) ? c.id : uid('s'),
+      text: typeof c.text === 'string' ? c.text : '',
+      status,
+      parent: typeof c.parent === 'string' ? c.parent : null,
+      seq: Number.isFinite(Number(c.seq)) && c.seq !== null && c.seq !== '' ? Number(c.seq) : i,
+      note: typeof c.note === 'string' ? c.note : '',
+      autoDone: c.autoDone === true && status === 'done',
+    };
+  });
+  const seen = new Set();
+  const uniqList = list.filter(c => (seen.has(c.id) ? false : seen.add(c.id)));
+  const byId = Object.fromEntries(uniqList.map(c => [c.id, c]));
+  for (const c of uniqList) {
+    if (c.parent && (!byId[c.parent] || c.parent === c.id)) c.parent = null;
+    const chain = new Set([c.id]);
+    for (let q = c.parent; q; q = byId[q].parent) { if (chain.has(q)) { c.parent = null; break; } chain.add(q); }
+  }
+  return uniqList;
 }
 function normProject(id, r) {
   r = r && typeof r === 'object' ? r : {};
@@ -754,10 +835,43 @@ function computeLayout(p) {
   };
 }
 
-// A task's checklist, which its ring, its counts and its auto-completion follow.
-function subOf(p, id) {
-  const c = p.nodes[id].checklist;
-  return { total: c.length, done: c.filter(x => x.done).length };
+// ---------- the inner layer: each card holds a task tree of the work inside it
+// Lines in a task tree mean "is part of". A parent's ring fills by its children; a parent whose children
+// are all done completes itself, and so on upward; once every top-level task is done, the card itself
+// completes and unlocks what follows it in the tech tree. A route is offered for adoption, never adopted.
+const kidsOf = (n, pid) => n.subtasks.filter(x => x.parent === pid).sort((a, b) => a.seq - b.seq);
+const findSub = (n, sid) => n.subtasks.find(x => x.id === sid) || null;
+function subProgress(n, pid) {
+  const k = kidsOf(n, pid).filter(x => x.status !== 'dropped');
+  return { total: k.length, done: k.filter(x => x.status === 'done').length };
+}
+const subOf = (p, id) => subProgress(p.nodes[id], null);   // a card's top level, which its ring follows
+function inSubtree(n, sid, rootId) {
+  for (let x = findSub(n, sid), guard = 0; x && guard < 500; x = x.parent ? findSub(n, x.parent) : null, guard++) if (x.id === rootId) return true;
+  return false;
+}
+// Settle every level from a parent (an item id, or null for the card) up to the card.
+function settleUp(n, pid) {
+  const res = { completed: [], reopened: [], tech: null };
+  let at = pid;
+  for (let guard = 0; guard < 500; guard++) {
+    const holder = at === null ? n : findSub(n, at);
+    if (!holder) break;
+    const kids = kidsOf(n, at).filter(x => x.status !== 'dropped');
+    const all = kids.length > 0 && kids.every(x => x.status === 'done');
+    const started = kids.some(x => x.status === 'done' || x.status === 'active');
+    const auto = at !== null || !isRoute(n);
+    if (all && auto && holder.status !== 'done' && holder.status !== 'dropped') {
+      holder.status = 'done'; holder.autoDone = true;
+      if (at === null) res.tech = 'completed'; else res.completed.push(at);
+    } else if (!all && holder.status === 'done' && holder.autoDone) {
+      holder.status = 'active'; holder.autoDone = false;
+      if (at === null) res.tech = 'reopened'; else res.reopened.push(at);
+    } else if (started && holder.status === 'todo') holder.status = 'active';   // work inside has begun
+    if (at === null) break;
+    at = holder.parent;
+  }
+  return res;
 }
 
 // ---------- the example tree (opened the first time the local file runs)
@@ -967,6 +1081,7 @@ function deleteNode(id) {
   const p = cur();
   const n = p && p.nodes[id];
   if (!n || state.readOnly) return;
+  if (state.inner && state.inner.id === id) closeInner(true);
   mutate(p => {
     for (const m of Object.values(p.nodes)) {
       if (m.id === id) continue;
@@ -979,16 +1094,7 @@ function deleteNode(id) {
   if (state.sel === id) { state.sel = null; render(); renderInspector(); }
   toast(`Deleted “${trunc(n.title, 40)}”`, { action: 'Undo', onAction: undo });
 }
-let fx = {};   // one-shot animation classes for the next canvas render
-// A checklist completes its task once every item is ticked, and reopens a task it completed when an
-// item is unticked or added. A task marked done by hand is left alone.
-function settleChecklist(n) {
-  if (isRoute(n) || !n.checklist.length) return null;
-  const all = n.checklist.every(c => c.done);
-  if (all && n.status !== 'done' && n.status !== 'dropped') { n.status = 'done'; n.autoDone = true; return 'completed'; }
-  if (!all && n.status === 'done' && n.autoDone) { n.status = 'active'; n.autoDone = false; return 'reopened'; }
-  return null;
-}
+let fx = {}, ifx = {};   // one-shot animation classes for the next render of the outer and inner layers
 // Chime, animate and report what a change to one idea did to the rest of the tree.
 function feedback(id, was, { completed = false, reopened = false, ticked = false } = {}) {
   const N = cur().nodes, n = N[id];
@@ -1004,8 +1110,8 @@ function feedback(id, was, { completed = false, reopened = false, ticked = false
   else if (ticked) play('tick');
 
   const msg = [];
-  if (completed) msg.push(`Completed “${trunc(n.title, 30)}”: every checklist item is ticked.`);
-  if (reopened) msg.push(`Reopened “${trunc(n.title, 30)}”, since its checklist has an open item again.`);
+  if (completed) msg.push(`Completed “${trunc(n.title, 30)}”: every task inside it is done.`);
+  if (reopened) msg.push(`Reopened “${trunc(n.title, 30)}”, since a task inside it is open again.`);
   if (opened.length) msg.push(`Unlocked ${names(opened)}.`);
   if (sup.length) msg.push(`Superseded ${names(sup)}.`);
   // A route whose tasks are all finished is ready for a decision: offer it, never make it.
@@ -1030,79 +1136,129 @@ function setStatus(id, s) {
   feedback(id, was);
 }
 
-// ---------- checklists: the work inside a task
-function editChecklist(id, fn, { ticked = false } = {}) {
+// ---------- editing a card's task tree
+// Run a change to one card's task tree, then chime, animate and report on whatever it settled.
+function subEdit(techId, fn, { ticked = null } = {}) {
   const p = cur();
-  if (!p || !p.nodes[id] || isRoute(p.nodes[id]) || state.readOnly) return null;
+  if (!p || !p.nodes[techId] || state.readOnly) return null;
   const was = { ...D };
-  let result = null;
-  mutate(p => { const n = p.nodes[id]; fn(n); n.updated = nowISO(); result = settleChecklist(n); }, { insp: true });
-  if (result || ticked) feedback(id, was, { completed: result === 'completed', reopened: result === 'reopened', ticked });
-  return result;
+  let res = null;
+  mutate(p => { const t = p.nodes[techId]; res = fn(t) || null; t.updated = nowISO(); }, { insp: true });
+  if (!res) return null;
+  const t = cur().nodes[techId];
+  const names = ids => { const a = ids.map(k => `“${trunc((findSub(t, k) || {}).text, 30)}”`); return a.slice(0, 3).join(', ') + (a.length > 3 ? ` and ${a.length - 3} more` : ''); };
+  if (ticked) ifx[ticked] = 'fx-done';
+  res.completed.forEach(k => { ifx[k] = 'fx-cascade'; });
+  res.reopened.forEach(k => { ifx[k] = 'fx-tick'; });
+  if (res.tech) { ifx.__root = res.tech === 'completed' ? 'fx-cascade' : 'fx-tick'; feedback(techId, was, { completed: res.tech === 'completed', reopened: res.tech === 'reopened' }); return res; }
+  render();
+  if (res.completed.length) play('complete'); else if (ticked) play('tick');
+  const msg = [];
+  if (res.completed.length) msg.push(`Completed ${names(res.completed)}: all ${res.completed.length > 1 ? 'their' : 'its'} subtasks are done.`);
+  if (res.reopened.length) msg.push(`Reopened ${names(res.reopened)}, since a subtask is open again.`);
+  const top = subProgress(t, null);
+  if (ticked && isRoute(t) && t.status === 'active' && top.total && top.done === top.total) {
+    msg.push(`Every task inside “${trunc(t.title, 30)}” is done.`);
+    toast(msg.join(' '), { action: 'Adopt route', onAction: () => setStatus(techId, 'done') });
+  } else if (msg.length) toast(msg.join(' '));
+  return res;
 }
-function toggleItem(id, itemId, done) {
-  editChecklist(id, n => {
-    const it = n.checklist.find(c => c.id === itemId);
-    if (!it) return;
-    it.done = done;
-    if (done && n.status === 'todo') n.status = 'active';   // ticking the first item starts the task
-  }, { ticked: done });
+const innerTech = () => (state.inner && cur() ? cur().nodes[state.inner.id] || null : null);
+function iSetStatus(sid, s) {
+  const n = innerTech(), it = n && findSub(n, sid);
+  if (!it || it.status === s) return;
+  subEdit(n.id, t => { const x = findSub(t, sid); x.status = s; x.autoDone = false; return settleUp(t, x.parent); }, { ticked: s === 'done' ? sid : null });
 }
-function addItem(id, text) {
-  editChecklist(id, n => { n.checklist.push({ id: uid('c'), text, done: false, note: '' }); });
+function iToggle(sid) {
+  const n = innerTech(), it = n && findSub(n, sid);
+  if (it) iSetStatus(sid, it.status === 'done' ? 'todo' : 'done');
 }
-function deleteItem(id, itemId) {
-  const it = cur().nodes[id].checklist.find(c => c.id === itemId);
-  editChecklist(id, n => { n.checklist = n.checklist.filter(c => c.id !== itemId); });
-  if (it) toast(`Deleted “${trunc(it.text || 'item', 40)}”`, { action: 'Undo', onAction: undo });
+function addSub(techId, pid, text, { open = false } = {}) {
+  let newId = null;
+  subEdit(techId, t => {
+    const x = { id: uid('s'), text, status: 'todo', parent: pid, seq: Math.max(-1, ...t.subtasks.map(y => y.seq)) + 1, note: '', autoDone: false };
+    t.subtasks.push(x);
+    newId = x.id;
+    return settleUp(t, pid);
+  });
+  if (newId) ifx[newId] = 'fx-unlock';
+  if (newId && open) selectInner(newId, { center: true, focus: true });
+  else if (newId && state.inner) renderInner();
+  return newId;
 }
-// An item that turns out to have follow-ups of its own becomes a card right after its task.
-function promoteItem(id, itemId) {
-  const p = cur(), par = p && p.nodes[id], it = par && par.checklist.find(c => c.id === itemId);
+function iAdd(pid) { const n = innerTech(); if (n && !state.readOnly) addSub(n.id, pid, 'New task', { open: true }); }
+function iDelete(sid) {
+  const n = innerTech(), it = n && findSub(n, sid);
   if (!it || state.readOnly) return;
-  const was = { ...D };
-  let newId = null, result = null;
+  if (state.isel === sid) state.isel = null;
+  subEdit(n.id, t => {
+    const x = findSub(t, sid);
+    t.subtasks.forEach(y => { if (y.parent === sid) y.parent = x.parent; });   // its subtasks move up a level
+    t.subtasks = t.subtasks.filter(y => y.id !== sid);
+    return settleUp(t, x.parent);
+  });
+  toast(`Deleted “${trunc(it.text || 'task', 40)}”`, { action: 'Undo', onAction: undo });
+}
+function iReparent(sid, pid) {
+  const n = innerTech(), it = n && findSub(n, sid);
+  if (!it || state.readOnly || it.parent === pid || (pid && inSubtree(n, pid, sid))) return;
+  subEdit(n.id, t => {
+    const x = findSub(t, sid), old = x.parent;
+    x.parent = pid;
+    x.seq = Math.max(-1, ...t.subtasks.map(y => y.seq)) + 1;
+    const a = settleUp(t, old), b = settleUp(t, pid);
+    return { completed: [...a.completed, ...b.completed], reopened: [...a.reopened, ...b.reopened], tech: b.tech || a.tech };
+  });
+}
+// A task (with everything under it) that turns out to be its own step becomes a card after this one.
+function iPromote(sid) {
+  const n = innerTech(), it = n && findSub(n, sid);
+  if (!it || state.readOnly) return;
+  const techId = n.id, was = { ...D };
+  let newId = null, res = null;
   mutate(p => {
     const tiersBefore = L ? L.maxDepth + 1 : 0;
-    const n = p.nodes[id];
-    n.checklist = n.checklist.filter(c => c.id !== itemId);
-    const m = makeNode({ title: it.text || 'Untitled idea', notes: it.note, status: it.done ? 'done' : 'todo', kind: n.kind, prereqs: [id] });
+    const t = p.nodes[techId];
+    const moving = t.subtasks.filter(y => inSubtree(t, y.id, sid));
+    const m = makeNode({ title: it.text || 'Untitled idea', notes: it.note, status: it.status === 'dropped' ? 'todo' : it.status, kind: t.kind, prereqs: [techId] });
+    m.subtasks = moving.filter(y => y.id !== sid).map(y => ({ ...y, parent: y.parent === sid ? null : y.parent }));
+    t.subtasks = t.subtasks.filter(y => !moving.includes(y));
     insertNode(p, m, null);
     stampTier(p, m.id, tiersBefore);
-    n.updated = nowISO();
-    result = settleChecklist(n);
+    res = settleUp(t, it.parent);
     newId = m.id;
-  }, { insp: true });
+  });
+  state.isel = null;
   fx[newId] = 'fx-unlock';
-  if (result) feedback(id, was, { completed: result === 'completed', reopened: result === 'reopened' });
-  else render();
-  toast(`Moved “${trunc(it.text, 30)}” to its own card after “${trunc(par.title, 30)}”.`, { action: 'Undo', onAction: undo });
+  if (res && res.tech) feedback(techId, was, { completed: res.tech === 'completed', reopened: res.tech === 'reopened' }); else render();
+  renderInspector();
+  toast(`Moved “${trunc(it.text, 30)}” out to its own card after “${trunc(n.title, 30)}”.`, { action: 'Undo', onAction: undo });
 }
-// Follow-ups that are really parts of a task (single-parent tasks with nothing after them) can be
-// folded into its checklist. This is how trees from before checklists existed are tidied up.
+// The outer inspector's quick add puts a task at the top of a card's tree.
+function addItem(id, text) { addSub(id, null, text); }
+// Follow-ups that are really parts of a card (one parent, nothing after them, not alternatives) can be
+// folded into its task tree, bringing their own task trees along. This tidies up older trees.
 function foldable(p, id) {
   const all = Object.values(p.nodes);
   return all.filter(m => m.prereqs.length === 1 && m.prereqs[0] === id && !isRoute(m) && !m.alts.length
-    && !m.checklist.length && !all.some(k => k.prereqs.includes(m.id))).sort((a, b) => a.seq - b.seq);
+    && !all.some(k => k.prereqs.includes(m.id))).sort((a, b) => a.seq - b.seq);
 }
 function foldNextLayer(id) {
   const p = cur(), n = p && p.nodes[id];
-  if (!n || isRoute(n) || state.readOnly) return;
+  if (!n || state.readOnly) return;
   const kids = foldable(p, id);
   if (!kids.length) return;
-  const was = { ...D };
-  let result = null;
-  mutate(p => {
-    const t = p.nodes[id];
+  if (state.inner && kids.some(m => m.id === state.inner.id)) closeInner(true);
+  subEdit(id, t => {
+    let seq = Math.max(-1, ...t.subtasks.map(y => y.seq)) + 1;
     for (const m of kids) {
-      t.checklist.push({ id: uid('c'), text: m.title, done: m.status === 'done', note: [m.notes, m.findings].map(x => x.trim()).filter(Boolean).join(' · ') });
-      delete p.nodes[m.id];
+      const x = { id: uid('s'), text: m.title, status: m.status, parent: null, seq: seq++, note: [m.notes, m.findings].map(v => v.trim()).filter(Boolean).join(' · '), autoDone: m.autoDone };
+      t.subtasks.push(x, ...m.subtasks.map(y => ({ ...y, parent: y.parent === null ? x.id : y.parent, seq: seq++ })));
+      delete cur().nodes[m.id];
     }
-    t.updated = nowISO();
-    result = settleChecklist(t);
-  }, { insp: true });
-  if (result) feedback(id, was, { completed: result === 'completed' });
-  toast(`Moved ${kids.length} follow-up${kids.length > 1 ? 's' : ''} into the checklist of “${trunc(n.title, 30)}”.${result === 'completed' ? ' Every item is ticked, so it is done.' : ''}`, { action: 'Undo', onAction: undo });
+    return settleUp(t, null);
+  });
+  toast(`Moved ${kids.length} follow-up${kids.length > 1 ? 's' : ''} into the task tree of “${trunc(n.title, 30)}”.`, { action: 'Undo', onAction: undo });
 }
 function setType(id, type) {
   const p = cur();
@@ -1148,6 +1304,7 @@ function move(id, dir) {
 
 // ---------- projects
 function openProject(pid, { fresh = false } = {}) {
+  if (state.inner) closeInner(true);
   state.pid = pid && state.projects[pid] ? pid : (projectList()[0] ? projectList()[0].id : null);
   state.sel = null;
   lastCo = null;
@@ -1201,9 +1358,14 @@ function render() {
   el.empty.hidden = true;
   L = computeLayout(p);
   D = computeDerived(p);
+  if (state.inner && !p.nodes[state.inner.id]) { closeInner(true); return; }
+  if (state.inner && state.isel && state.isel !== '__root' && !findSub(p.nodes[state.inner.id], state.isel)) state.isel = null;
   renderWorld(p);
   renderTierBar();
   renderFrontier();
+  renderInner();
+  if (state.inner) el.frontier.hidden = true;
+  el.tierbar.hidden = !!state.inner;
 }
 let projKey = '';
 function renderHeader() {
@@ -1217,8 +1379,10 @@ function renderHeader() {
   el.projSel.disabled = !ps.length;
   el.projMenuBtn.disabled = !cur();
   el.addBtn.disabled = !cur();
-  el.addBtn.textContent = state.sel ? '+ Follow-up' : '+ Idea';
-  el.addBtn.title = state.sel ? 'Add an idea that builds on the selected one (N)' : 'Add a new starting idea (N)';
+  const subSel = state.inner && state.isel && state.isel !== '__root';
+  el.addBtn.textContent = state.inner ? (subSel ? '+ Subtask' : '+ Task') : state.sel ? '+ Follow-up' : '+ Idea';
+  el.addBtn.title = state.inner ? (subSel ? 'Add a part of the selected task (N)' : 'Add a top-level task inside this card (N)')
+    : state.sel ? 'Add an idea that builds on the selected one (N)' : 'Add a new starting idea (N)';
   el.undoBtn.disabled = !(undoStacks[state.pid] && undoStacks[state.pid].length);
   el.zIn.disabled = el.zOut.disabled = el.zFit.disabled = !cur();
 }
@@ -1228,8 +1392,8 @@ function showEmpty(kind) {
   const acts = state.readOnly ? '' : `<div class="e-acts"><button class="btn primary" data-empty="new">Start a tree</button>${state.mode === 'local' ? '<button class="btn" data-empty="example">Load the HKT example</button>' : ''}<button class="btn" data-empty="import">Import JSON</button></div>`;
   el.empty.innerHTML = `<div class="empty-card"><h2>No trees yet</h2><p>Each tree holds one research project. Ideas are cards; a line from a card to one on its right means the first has to be done before the second can start.</p>${acts}</div>`;
 }
-function route(x1, y1, x2, y2) {
-  const xm = x2 - GAP / 2;
+function route(x1, y1, x2, y2, gap = GAP) {
+  const xm = x2 - gap / 2;
   if (Math.abs(y2 - y1) < 0.5) return `M${x1} ${y1}H${x2}`;
   const s = y2 > y1 ? 1 : -1;
   const r = Math.min(12, Math.abs(y2 - y1) / 2, Math.max(0, xm - x1));
@@ -1313,7 +1477,7 @@ function renderWorld(p) {
       if (n.effort != null) meta.push(`<span title="Estimated effort">~${fmtEff(n.effort)}</span>`);
     }
     if (unl) meta.push(`<span title="Unlocks ${unl} idea${unl > 1 ? 's' : ''}">&rarr;&thinsp;${unl}</span>`);
-    html += `<div class="node${route ? ' route' : ''}${fxNow[n.id] ? ' ' + fxNow[n.id] : ''} s-${ds}${n.id === sel ? ' sel' : ''}${anc.has(n.id) ? ' anc' : ''}" data-id="${esc(n.id)}" style="left:${pos.x}px;top:${pos.y}px" tabindex="0" role="button" title="${esc(n.title)}" aria-label="${esc(n.title)}: ${route ? 'route, ' : ''}${dsLabel(ds, n)}">`
+    html += `<div class="node${route ? ' route' : ''}${state.inner && state.inner.id === n.id ? ' portal' : ''}${fxNow[n.id] ? ' ' + fxNow[n.id] : ''} s-${ds}${n.id === sel ? ' sel' : ''}${anc.has(n.id) ? ' anc' : ''}" data-id="${esc(n.id)}" style="left:${pos.x}px;top:${pos.y}px" tabindex="0" role="button" title="${esc(n.title)}" aria-label="${esc(n.title)}: ${route ? 'route, ' : ''}${dsLabel(ds, n)}">`
       + `<div class="medal">${route ? routeMedal(ds, t) : medal(ds, n.progress, subOf(p, n.id))}</div>`
       + `<div class="nbody"><div class="ntitle">${esc(n.title || 'Untitled idea')}</div><div class="nmeta">${meta.join('')}</div></div>`
       + (state.readOnly ? '' : `<span class="port" data-port="${esc(n.id)}" title="Drag onto a later idea to make this its prerequisite"></span>`)
@@ -1411,7 +1575,7 @@ function renderFrontier() {
     + `<h3 class="fr-h">Researching</h3>${act.length ? act.map(item).join('') : '<p class="fr-none">Nothing in progress. Start one of the available ideas.</p>'}`
     + `<h3 class="fr-h">Available</h3>${av.length ? av.map(item).join('') : '<p class="fr-none">Nothing is unlocked right now. Finish a task or explore a route to open what comes next.</p>'}`
     + `<div class="legend">${DS_ORDER.map(s => `<span><i class="dot s-${s}"></i>${LEGEND_LABEL[s] || DS_LABEL[s]}</span>`).join('')}<span><i class="dot shape"></i>Task</span><span><i class="dot shape route"></i>Route</span></div>`
-    + '<p class="keys edit-only"><kbd>N</kbd> task · <kbd>R</kbd> competing routes · <kbd>P</kbd> parallel · <kbd>F</kbd> fit · <kbd>Del</kbd> delete · <kbd>Ctrl Z</kbd> undo. Drag the dot on a card\'s right edge onto another card to link them.</p>'
+    + '<p class="keys edit-only"><kbd>N</kbd> task · <kbd>R</kbd> competing routes · double-click a card to open its task tree · <kbd>P</kbd> parallel · <kbd>F</kbd> fit · <kbd>Del</kbd> delete · <kbd>Ctrl Z</kbd> undo. Drag the dot on a card\'s right edge onto another card to link them.</p>'
     + '</div>';
   const nb = el.frontier.querySelector('.fr-body');
   if (nb) nb.scrollTop = scroll;
@@ -1423,10 +1587,10 @@ function why(p, n, ds) {
   switch (ds) {
     case 'done':
       if (route) return `Adopted.${n.alts.length ? ' Its alternatives are superseded.' : ''}${n.findings ? '' : ' Record why under Evidence.'}`;
-      return (n.autoDone ? 'Done automatically, because every checklist item is ticked.' : 'Done.') + (n.findings ? '' : ' Note what you learned under Findings.');
+      return (n.autoDone ? 'Done automatically, because every task inside it is done.' : 'Done.') + (n.findings ? '' : ' Note what you learned under Findings.');
     case 'active':
       if (route) return `Exploring, so the tasks in its branch are open. Mark it Adopted once the evidence favors it${n.alts.length ? '; that supersedes its alternatives' : ''}.`;
-      { const sub = subOf(p, n.id); return sub.total ? `In progress: ${sub.done} of ${sub.total} checklist items ticked. It completes itself when the last one is.` : `In progress, ${n.progress}% along.`; }
+      { const sub = subOf(p, n.id); return sub.total ? `In progress: ${sub.done} of ${sub.total} tasks inside are done. It completes itself when the last one is.` : `In progress, ${n.progress}% along.`; }
     case 'available':
       if (route) return n.prereqs.length ? 'All prerequisites are met. Set it to Exploring to open its follow-ups.' : 'A starting route. Set it to Exploring to open its follow-ups.';
       return n.prereqs.length ? 'All prerequisites are met. Ready to start.' : 'A starting point with no prerequisites. Ready to start.';
@@ -1459,20 +1623,21 @@ function pathInfo(p, n) {
     + (open.length ? '<p class="hint">The blue lines on the tree trace it.</p>' : '')
     + '</div>';
 }
-function checklistBox(p, n) {
-  const sub = subOf(p, n.id), ro = state.readOnly ? ' disabled' : '';
-  const items = n.checklist.map(c => `<li class="ck-item${c.done ? ' done' : ''}" data-item="${esc(c.id)}">`
-    + `<input type="checkbox" id="ck-${esc(c.id)}" data-ck="toggle"${c.done ? ' checked' : ''}${ro} aria-label="Ticked: ${esc(c.text || 'item')}">`
-    + `<input class="ck-text" id="ckt-${esc(c.id)}" data-ck="text" value="${esc(c.text)}" maxlength="200" aria-label="Checklist item"${ro}>`
-    + (state.readOnly ? '' : '<button class="ck-btn" data-ck="promote" title="Move to its own card after this task" aria-label="Move to its own card">&#8599;</button><button class="ck-btn" data-ck="del" title="Delete item" aria-label="Delete item">&times;</button>')
-    + (c.note ? `<p class="ck-note">${esc(c.note)}</p>` : '')
-    + '</li>').join('');
+function innerBox(p, n) {
+  const sub = subOf(p, n.id), top = kidsOf(n, null);
+  const rows = top.map(x => {
+    const pr = subProgress(n, x.id);
+    return `<li><button class="tt-row${x.status === 'done' ? ' done' : ''}" data-act="open-inner" data-sid="${esc(x.id)}" title="Open the task tree at this task">`
+      + `<i class="dot s-${x.status === 'todo' ? 'locked' : x.status}"></i><span class="t">${esc(x.text || 'Untitled task')}</span><span class="m">${pr.total ? `${pr.done}/${pr.total}` : ''}</span></button></li>`;
+  }).join('');
   const fold = state.readOnly ? [] : foldable(p, n.id);
-  return `<section class="field ck"><h4 class="lbl">Checklist${sub.total ? ` <span class="num">${sub.done}/${sub.total}</span>` : ''}</h4>`
-    + (items ? `<ul class="cklist">${items}</ul>` : '')
-    + (state.readOnly ? '' : '<input class="inp ck-new" id="ck-new" maxlength="200" placeholder="Add an item and press Enter" aria-label="New checklist item">')
-    + `<p class="hint">${sub.total ? 'When every item is ticked, this task completes itself and unlocks what follows it.' : 'Break the work inside this task into items. Ticking the last one completes the task.'}</p>`
-    + (fold.length ? `<button class="btn sm" data-act="fold" title="Simple follow-ups (one parent, nothing after them) become checklist items">Fold ${fold.length} follow-up${fold.length > 1 ? 's' : ''} into this checklist</button>` : '')
+  const ends = isRoute(n) ? 'you will be asked whether to adopt this route' : 'this task completes itself and unlocks what follows it';
+  return `<section class="field ck"><h4 class="lbl">Task tree${sub.total ? ` <span class="num">${sub.done}/${sub.total}</span>` : ''}</h4>`
+    + (rows ? `<ul class="tt-list">${rows}</ul>` : '')
+    + (state.readOnly ? '' : '<input class="inp ck-new" id="ck-new" maxlength="200" placeholder="Add a top-level task and press Enter" aria-label="New top-level task">')
+    + (state.inner ? '' : `<button class="btn primary" data-act="open-inner" title="Double-click the card, or press Enter on a selected card">Open task tree</button>`)
+    + `<p class="hint">${sub.total ? `When every top-level task is done, ${ends}.` : 'Break the work inside this card into a task tree. Double-click the card to open it.'}</p>`
+    + (fold.length ? `<button class="btn sm" data-act="fold" title="Follow-ups with one parent and nothing after them move inside, with their own task trees">Fold ${fold.length} follow-up${fold.length > 1 ? 's' : ''} into the task tree</button>` : '')
     + '</section>';
 }
 function routeBox(p, n) {
@@ -1500,6 +1665,11 @@ function compareAlts(p, n) {
     + `<p class="hint">${isRoute(n) ? 'Explore routes side by side. Adopting one supersedes the others.' : 'Finishing one supersedes the others.'}</p></section>`;
 }
 function renderInspector() {
+  if (state.inner) {
+    if (state.isel && state.isel !== '__root') { renderInnerInspector(); return; }
+    if (state.isel !== '__root') { el.insp.hidden = true; el.insp.innerHTML = ''; el.insp.dataset.mode = ''; return; }
+  }
+  el.insp.dataset.mode = 'outer';
   const p = cur();
   const n = p && state.sel ? p.nodes[state.sel] : null;
   if (!n || !L) { el.insp.hidden = true; el.insp.innerHTML = ''; return; }
@@ -1519,7 +1689,8 @@ function renderInspector() {
     + `<div class="seg" role="group" aria-label="Status">${STATUSES.map(s => `<button data-status="${s}" class="${n.status === s ? 'on' : ''}" aria-pressed="${n.status === s}"${ro}>${STATUS_LABEL[type][s]}</button>`).join('')}</div>`
     + `<p class="why">${why(p, n, ds)}</p>`
     + (!route && n.status === 'active' && !sub.total ? `<div class="field"><label class="lbl" for="f-prog">Progress <span class="num" id="progVal">${n.progress}%</span></label><input id="f-prog" type="range" min="0" max="100" step="5" value="${n.progress}" data-f="progress"${ro}></div>` : '')
-    + (route ? routeBox(p, n) : checklistBox(p, n))
+    + (route ? routeBox(p, n) : '')
+    + innerBox(p, n)
     + `<div class="row2"><div class="field"><label class="lbl" for="f-kind">Kind</label><select id="f-kind" data-f="kind"${ro}>${KINDS.map(k => `<option${k === n.kind ? ' selected' : ''}>${k}</option>`).join('')}</select></div>`
     + (route ? '' : `<div class="field"><label class="lbl" for="f-eff">Effort, days</label><input id="f-eff" class="num" type="number" min="0" step="0.5" inputmode="decimal" data-f="effort" placeholder="Not estimated" value="${n.effort == null ? '' : n.effort}"${ro}></div>`)
     + '</div>'
@@ -1536,8 +1707,200 @@ function renderInspector() {
     + `<p class="i-meta">Added ${fmtDate(n.created)} · edited ${fmtDate(n.updated)}</p>`;
 }
 
+function renderInnerInspector() {
+  const n = innerTech(), x = n && findSub(n, state.isel);
+  if (!x || !IL) { el.insp.hidden = true; el.insp.innerHTML = ''; return; }
+  el.insp.dataset.mode = 'inner';
+  const ro = state.readOnly ? ' disabled' : '', kids = kidsOf(n, x.id), pr = subProgress(n, x.id);
+  let level = 1;
+  for (let q = x.parent; q; q = (findSub(n, q) || {}).parent) level++;
+  const why = x.status === 'done' ? (x.autoDone ? 'Done automatically, because all its subtasks are done.' : 'Done.')
+    : x.status === 'dropped' ? 'Dropped. It no longer counts toward the task above it.'
+    : kids.length ? `${pr.done} of ${pr.total} subtasks done. It completes itself when the last one is.`
+    : x.status === 'active' ? 'In progress. Click its circle on the card when it is done.' : 'Not started. Click its circle on the card to tick it off.';
+  const parents = n.subtasks.filter(y => y.id !== x.id && !inSubtree(n, y.id, x.id)).sort((a, b) => a.seq - b.seq);
+  const chips = kids.map(y => `<span class="chip"><i class="dot s-${y.status === 'todo' ? 'locked' : y.status}"></i><button class="chip-t" data-ia="goto" data-sid="${esc(y.id)}" title="${esc(y.text)}">${esc(trunc(y.text || 'Untitled task', 38))}</button></span>`).join('');
+  const pill = { todo: '', active: ' s-active', done: ' s-done', dropped: ' s-dropped' }[x.status];
+  el.insp.hidden = false;
+  el.insp.innerHTML = `<div class="i-top"><span class="pill${pill}">${ISTATUS_LABEL[x.status]}</span><span class="i-tier">Level ${roman(level)}</span><span class="grow"></span><button class="icon-btn" data-ia="close" aria-label="Close details">&times;</button></div>`
+    + `<label class="sr" for="if-text">Task</label><textarea id="if-text" class="i-title" data-if="text" rows="2" maxlength="200" placeholder="Name this task"${ro}>${esc(x.text)}</textarea>`
+    + `<div class="seg" role="group" aria-label="Status">${STATUSES.map(s => `<button data-istatus="${s}" class="${x.status === s ? 'on' : ''}" aria-pressed="${x.status === s}"${ro}>${ISTATUS_LABEL[s]}</button>`).join('')}</div>`
+    + `<p class="why">${why}</p>`
+    + `<section class="field"><h4 class="lbl">Subtasks${pr.total ? ` <span class="num">${pr.done}/${pr.total}</span>` : ''}</h4>${chips ? `<div class="chips">${chips}</div>` : '<p class="none">None yet. Break this task down further if it helps.</p>'}`
+    + (state.readOnly ? '' : '<input class="inp ck-new" id="if-new" maxlength="200" placeholder="Add a subtask and press Enter" aria-label="New subtask">') + '</section>'
+    + `<div class="field"><label class="lbl" for="if-note">Notes</label><textarea id="if-note" data-if="note" rows="3" placeholder="Anything worth remembering about this task"${ro}>${esc(x.note)}</textarea></div>`
+    + `<div class="field"><label class="lbl" for="if-parent">Part of</label><select id="if-parent" data-iparent="1"${ro}><option value=""${x.parent ? '' : ' selected'}>The card itself: “${esc(trunc(n.title, 40))}”</option>${parents.map(y => `<option value="${esc(y.id)}"${x.parent === y.id ? ' selected' : ''}>${esc(trunc(y.text || 'Untitled task', 50))}</option>`).join('')}</select></div>`
+    + '<div class="add-row edit-only"><span class="lbl">Add</span><button class="btn" data-ia="child" title="A part of this task (N)">+ Subtask</button><button class="btn" data-ia="sibling" title="Another task at this level (P)">+ Sibling</button></div>'
+    + '<div class="i-acts2 edit-only"><button class="btn" data-ia="promote" title="Move it, with its subtasks, out to its own card after this one in the tech tree">&#8599; Move to the tech tree</button><span class="grow"></span><button class="btn danger" data-ia="del">Delete</button></div>';
+}
+
+// ---------- the inner layer: layout, drawing, and moving between layers
+const IW = 220, IH = 66, IGAP = 60, IROWH = 84, IPAD = 64, RW = 264, RH = 100;
+let IL = null, outerView = null, recede = null, innerBase = null;
+function innerLayout(n) {
+  const kids = {};
+  for (const x of [...n.subtasks].sort((a, b) => a.seq - b.seq)) (kids[x.parent || '__root'] = kids[x.parent || '__root'] || []).push(x.id);
+  const slot = {}, depth = {};
+  let next = 0;
+  const place = (id, d) => {
+    depth[id] = d;
+    const ch = kids[id] || [];
+    if (!ch.length) { slot[id] = next++; return [slot[id], slot[id]]; }
+    let lo = Infinity, hi = -Infinity;
+    for (const c of ch) { const [a, b] = place(c, d + 1); lo = Math.min(lo, a); hi = Math.max(hi, b); }
+    slot[id] = (lo + hi) / 2;
+    return [lo, hi];
+  };
+  place('__root', 0);
+  const colX = d => (d === 0 ? IPAD : IPAD + RW + IGAP + (d - 1) * (IW + IGAP));
+  const pos = {};
+  let maxD = 0;
+  for (const id in slot) {
+    const d = depth[id], w = d === 0 ? RW : IW, h = d === 0 ? RH : IH;
+    maxD = Math.max(maxD, d);
+    pos[id] = { x: colX(d), y: IPAD + slot[id] * IROWH + IH / 2 - h / 2, w, h, d };
+  }
+  const top = Math.min(...Object.values(pos).map(q => q.y));
+  if (top < IPAD) for (const id in pos) pos[id].y += IPAD - top;
+  return { pos, width: colX(maxD) + (maxD === 0 ? RW : IW) + IPAD, height: Math.max(...Object.values(pos).map(q => q.y + q.h)) + IPAD };
+}
+function imedal(x, pr) {
+  const C = 2 * Math.PI * 15, o = '<svg viewBox="0 0 40 40" aria-hidden="true">';
+  if (x.status === 'done') return o + '<circle cx="20" cy="20" r="16" class="m-done"/><path d="M13 20.5l4.5 4.5 9.5-10" class="m-check" fill="none"/></svg>';
+  if (x.status === 'dropped') return o + '<circle cx="20" cy="20" r="15" class="m-ring-drop" fill="none"/><path d="M15 15l10 10M25 15l-10 10" class="m-x" fill="none"/></svg>';
+  if (pr.total) {
+    const label = `${pr.done}/${pr.total}`;
+    return o + `<circle cx="20" cy="20" r="15" class="m-track" fill="none"/><circle cx="20" cy="20" r="15" class="m-prog" fill="none" stroke-dasharray="${(C * pr.done / pr.total).toFixed(2)} ${C.toFixed(2)}" transform="rotate(-90 20 20)"/><text x="20" y="23.5" class="m-pct${label.length > 3 ? ' sm' : ''}">${label}</text></svg>`;
+  }
+  if (x.status === 'active') return o + '<circle cx="20" cy="20" r="15" class="m-track" fill="none"/><circle cx="20" cy="20" r="6" class="i-dot"/><path d="M13 20.5l4.5 4.5 9.5-10" class="i-hint" fill="none"/></svg>';
+  return o + '<circle cx="20" cy="20" r="15" class="i-ring" fill="none"/><path d="M13 20.5l4.5 4.5 9.5-10" class="i-hint" fill="none"/></svg>';
+}
+function renderInner() {
+  const n = innerTech();
+  el.crumb.hidden = !n;
+  if (!n) { IL = null; return; }
+  IL = innerLayout(n);
+  const ifxNow = ifx;
+  ifx = {};
+  el.iworld.style.width = IL.width + 'px';
+  el.iworld.style.height = IL.height + 'px';
+  let paths = '';
+  for (const x of n.subtasks) {
+    const a = IL.pos[x.parent || '__root'], b = IL.pos[x.id];
+    if (!a || !b) continue;
+    const cls = x.status === 'done' ? 'e iedge e-done' : x.status === 'dropped' ? 'e iedge e-faint' : 'e iedge e-open';
+    paths += `<path class="${cls}" d="${route(a.x + a.w, a.y + a.h / 2, b.x, b.y + b.h / 2, IGAP)}"/>`;
+  }
+  el.iedges.setAttribute('width', IL.width);
+  el.iedges.setAttribute('height', IL.height);
+  el.iedges.innerHTML = paths;
+  const ds = D[n.id] || 'locked', top = subProgress(n, null), r = IL.pos.__root, route_ = isRoute(n);
+  let html = `<div class="inode iroot${route_ ? ' route' : ''} s-${ds}${state.isel === '__root' ? ' sel' : ''}${ifxNow.__root ? ' ' + ifxNow.__root : ''}" data-iid="__root" style="left:${r.x}px;top:${r.y}px" tabindex="0" role="button" title="Double-click to go back to the tech tree" aria-label="${esc(n.title)}: ${dsLabel(ds, n)}">`
+    + `<div class="medal">${route_ ? routeMedal(ds, top) : medal(ds, n.progress, top)}</div>`
+    + `<div class="nbody"><div class="ikicker">${route_ ? 'Route' : 'Tech'} · ${dsLabel(ds, n)}</div><div class="ntitle">${esc(n.title || 'Untitled idea')}</div><div class="nmeta"><span>${top.total ? `${top.done}/${top.total} done` : 'No tasks yet: press N'}</span></div></div></div>`;
+  for (const x of n.subtasks) {
+    const q = IL.pos[x.id];
+    if (!q) continue;
+    const pr = subProgress(n, x.id);
+    html += `<div class="inode s-${x.status}${state.isel === x.id ? ' sel' : ''}${ifxNow[x.id] ? ' ' + ifxNow[x.id] : ''}" data-iid="${esc(x.id)}" style="left:${q.x}px;top:${q.y}px" tabindex="0" role="button" title="${esc(x.text)}" aria-label="${esc(x.text)}: ${ISTATUS_LABEL[x.status]}">`
+      + `<button class="imedal" data-imedal="${esc(x.id)}" title="${x.status === 'done' ? 'Mark as not done' : 'Mark as done'}" aria-label="${x.status === 'done' ? 'Mark as not done' : 'Mark as done'}"${state.readOnly ? ' disabled' : ''}>${imedal(x, pr)}</button>`
+      + `<div class="nbody"><div class="ntitle">${esc(x.text || 'Untitled task')}</div><div class="nmeta">${pr.total ? `<span>${pr.done}/${pr.total} subtasks</span>` : ''}${x.note ? '<span title="Has notes">notes</span>' : ''}</div></div></div>`;
+  }
+  el.inodes.innerHTML = html;
+  el.crumbTitle.textContent = n.title || 'Untitled idea';
+  el.crumbProg.textContent = top.total ? `${top.done}/${top.total}` : '';
+}
+// Opening a card: the tech tree swells toward the camera and recedes into a blurred ring around the
+// edges, while the card's task tree grows out of the card's own position.
+function openInner(id, { selectSub = null } = {}) {
+  const p = cur();
+  if (!p || !p.nodes[id] || !L || !L.pos[id] || state.inner) return;
+  cancelAnimationFrame(animId);
+  const pos = L.pos[id], vw = el.stage.clientWidth, vh = el.stage.clientHeight;
+  outerView = { ...view };
+  const ncx = view.x + (pos.x + W / 2) * view.k, ncy = view.y + (pos.y + H / 2) * view.k;
+  const kOut = clamp(view.k * 1.8, 0.7, 2.6);
+  recede = { k: kOut, x: vw / 2 - (pos.x + W / 2) * kOut, y: vh / 2 - (pos.y + H / 2) * kOut };
+  state.inner = { id };
+  state.sel = id;
+  state.isel = selectSub && findSub(p.nodes[id], selectSub) ? selectSub : null;
+  lastCo = null;
+  el.app.classList.add('inside');
+  el.world.inert = true;   // the receded tech tree is scenery until you come back out
+  if (!reduceMotion) el.world.classList.add('morph');
+  el.world.classList.add('receded');
+  render();
+  renderInspector();
+  el.insp.scrollTop = 0;
+  const rp = IL.pos.__root, k0 = view.k * W / RW;
+  innerBase = fitTarget();
+  view = { k: k0, x: ncx - (rp.x + RW / 2) * k0, y: ncy - (rp.y + RH / 2) * k0 };
+  applyView();
+  requestAnimationFrame(() => { el.iworld.classList.add('on'); el.vignette.classList.add('on'); animateTo(innerBase, 560); });
+  setTimeout(() => el.world.classList.remove('morph'), 700);
+  play('open');
+}
+function closeInner(instant = false) {
+  if (!state.inner) return;
+  const id = state.inner.id, p = cur(), ov = outerView || view;
+  cancelAnimationFrame(animId);
+  const animate = !instant && !reduceMotion && IL && L && L.pos[id];
+  if (animate) {   // shrink the task tree back into its card
+    const pos = L.pos[id], rp = IL.pos.__root, k0 = ov.k * W / RW;
+    const ncx = ov.x + (pos.x + W / 2) * ov.k, ncy = ov.y + (pos.y + H / 2) * ov.k;
+    el.iworld.classList.add('morph');
+    el.world.classList.add('morph');
+    el.iworld.style.transform = `translate(${ncx - (rp.x + RW / 2) * k0}px,${ncy - (rp.y + RH / 2) * k0}px) scale(${k0})`;
+  }
+  state.inner = null;
+  state.isel = null;
+  state.sel = p && p.nodes[id] ? id : null;
+  el.app.classList.remove('inside');
+  el.world.inert = false;
+  el.world.classList.remove('receded');
+  el.iworld.classList.remove('on');
+  el.vignette.classList.remove('on');
+  view = ov;
+  recede = innerBase = outerView = null;
+  applyView();
+  render();
+  renderInspector();
+  const cleanup = () => {
+    el.world.classList.remove('morph');
+    el.iworld.classList.remove('morph');
+    if (!state.inner) { el.inodes.innerHTML = ''; el.iedges.innerHTML = ''; }
+  };
+  if (animate) setTimeout(cleanup, 650); else cleanup();
+  if (!instant) play('close');
+}
+function centerInner(iid) {
+  const q = IL && IL.pos[iid];
+  if (!q) return;
+  const A = area(), k = view.k;
+  const cx = (q.x + q.w / 2) * k + view.x, cy = (q.y + q.h / 2) * k + view.y;
+  if (!(cx > A.l + q.w * k / 2 && cx < A.w - A.r - q.w * k / 2 && cy > A.t + q.h * k / 2 && cy < A.h - A.b - q.h * k / 2))
+    animateTo({ k, x: A.l + A.aw / 2 - (q.x + q.w / 2) * k, y: A.t + A.ah / 2 - (q.y + q.h / 2) * k });
+}
+function selectInner(iid, { center = false, focus = false } = {}) {
+  const n = innerTech();
+  if (!n) return;
+  const prev = state.isel;
+  state.isel = iid === '__root' ? '__root' : iid && findSub(n, iid) ? iid : null;
+  lastCo = null;
+  renderInner();
+  renderHeader();
+  renderInspector();
+  if (state.isel !== prev) el.insp.scrollTop = 0;
+  if (center && state.isel) centerInner(state.isel);
+  if (focus) { const t = $('if-text'); if (t && !t.disabled) { t.focus({ preventScroll: true }); t.select(); } }
+}
+
 // ---------- selection and camera
 function select(id, { center = false, force = false, focus = false } = {}) {
+  if (state.inner) {   // inside a card, the card itself stands in as the root of its task tree
+    if (!id || id === state.inner.id) { selectInner(id ? '__root' : null); return; }
+    closeInner(true);
+  }
   const p = cur(), prev = state.sel;
   state.sel = p && id && p.nodes[id] ? id : null;
   lastCo = null;
@@ -1548,7 +1911,14 @@ function select(id, { center = false, force = false, focus = false } = {}) {
   if (focus && state.sel) { const t = $('f-title'); if (t && !t.disabled) { t.focus({ preventScroll: true }); t.select(); } }
 }
 function applyView() {
-  el.world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.k})`;
+  const t = `translate(${view.x}px,${view.y}px) scale(${view.k})`;
+  if (state.inner) {
+    el.iworld.style.transform = t;
+    if (recede) {   // the receded tech tree drifts a little against the task tree, for depth
+      const dx = innerBase ? (view.x - innerBase.x) * 0.12 : 0, dy = innerBase ? (view.y - innerBase.y) * 0.12 : 0;
+      el.world.style.transform = `translate(${recede.x + dx}px,${recede.y + dy}px) scale(${recede.k})`;
+    }
+  } else el.world.style.transform = t;
   const g = 24 * view.k;
   el.viewport.style.backgroundSize = `${g}px ${g}px`;
   el.viewport.style.backgroundPosition = `${view.x}px ${view.y}px`;
@@ -1560,13 +1930,14 @@ function area() {
   if (wide && !el.frontier.hidden && frontierOpen()) l = el.frontier.offsetWidth + 28;
   if (!el.insp.hidden) { if (wide) r = el.insp.offsetWidth + 28; else b = el.insp.offsetHeight + 12; }
   if (!wide && !el.frontier.hidden) t = el.frontier.offsetHeight + 52;
+  if (state.inner && !el.crumb.hidden) t = el.crumb.offsetTop + el.crumb.offsetHeight + 20;
   return { l, r, t, b, w, h, aw: Math.max(80, w - l - r), ah: Math.max(80, h - t - b) };
 }
 let animId = 0;
-function animateTo(target) {
+function animateTo(target, dur = 280) {
   cancelAnimationFrame(animId);
   if (reduceMotion) { view = target; applyView(); rememberView(); return; }
-  const s = { ...view }, t0 = performance.now(), dur = 280;
+  const s = { ...view }, t0 = performance.now();
   const step = now => {
     const u = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - u, 3);
     view = { x: s.x + (target.x - s.x) * e, y: s.y + (target.y - s.y) * e, k: s.k + (target.k - s.k) * e };
@@ -1575,11 +1946,17 @@ function animateTo(target) {
   };
   animId = requestAnimationFrame(step);
 }
-function fit(animate = true) {
-  if (!L) return;
+function fitTarget() {
+  const box = state.inner ? IL : L;
+  if (!box) return null;
   const A = area();
-  const k = clamp(Math.min(A.aw / L.width, A.ah / L.height), KMIN, 1.1);
-  const target = { k, x: A.l + (A.aw - L.width * k) / 2, y: A.t + Math.max(0, (A.ah - L.height * k) / 2) };
+  const k = clamp(Math.min(A.aw / box.width, A.ah / box.height), KMIN, state.inner ? 1.2 : 1.1);
+  return { k, x: A.l + (A.aw - box.width * k) / 2, y: A.t + Math.max(0, (A.ah - box.height * k) / 2) };
+}
+function fit(animate = true) {
+  const target = fitTarget();
+  if (!target) return;
+  if (state.inner) innerBase = target;
   if (animate) animateTo(target); else { view = target; applyView(); rememberView(); }
 }
 function centerOn(id, force) {
@@ -1650,13 +2027,58 @@ document.addEventListener('click', ev => {
   lastTap = null;
   if (ghost) { ev.stopPropagation(); ev.preventDefault(); }
 }, true);
+let lastTapAt = { id: null, t: 0 }, tapCenterT = 0;   // for double-click and double-tap on cards
 function endPointer(e) {
   if (!ptrs.has(e.pointerId)) return;
   ptrs.delete(e.pointerId);
   if (gesture && gesture.type === 'pan' && !gesture.moved && e.type === 'pointerup') {
     swallowClick(e.clientX, e.clientY);
-    const nodeEl = gesture.target && gesture.target.closest ? gesture.target.closest('.node') : null;
-    select(nodeEl ? nodeEl.dataset.id : null, { center: true });
+    const tg = gesture.target && gesture.target.closest ? gesture.target : null;
+    const now = performance.now();
+    if (state.inner) {
+      const med = tg && tg.closest('[data-imedal]'), ino = tg && tg.closest('.inode');
+      const iid = ino ? ino.dataset.iid : null, dbl = iid && lastTapAt.id === iid && now - lastTapAt.t < 380;
+      lastTapAt = { id: iid, t: now };
+      clearTimeout(tapCenterT);
+      if (med && !med.disabled) iToggle(med.dataset.imedal);
+      else if (dbl && iid === '__root') closeInner();
+      else if (dbl) selectInner(iid, { center: true, focus: true });
+      else if (!iid) selectInner(null);
+      else if (!el.insp.hidden) { selectInner(iid); tapCenterT = setTimeout(() => { if (state.inner && state.isel === iid) centerInner(iid); }, 280); }
+      else {   // as on the tech tree: highlight now, open the panel once a double-click is ruled out
+        state.isel = iid;
+        lastCo = null;
+        renderInner();
+        renderHeader();
+        tapCenterT = setTimeout(() => {
+          if (!state.inner || state.isel !== iid) return;
+          renderInspector();
+          el.insp.scrollTop = 0;
+          centerInner(iid);
+        }, 280);
+      }
+    } else {
+      const nodeEl = tg && tg.closest('.node'), id = nodeEl ? nodeEl.dataset.id : null;
+      const dbl = id && lastTapAt.id === id && now - lastTapAt.t < 380;
+      lastTapAt = { id, t: now };
+      clearTimeout(tapCenterT);
+      if (dbl) { lastTapAt = { id: null, t: 0 }; openInner(id); }
+      else if (!id) select(null);
+      else if (!el.insp.hidden) { select(id); tapCenterT = setTimeout(() => { if (!state.inner && state.sel === id) centerOn(id, false); }, 280); }
+      else {
+        // Highlight now, but hold the inspector and the camera for a moment: the panel would
+        // otherwise slide over the card before a double-click's second click can land on it.
+        state.sel = id;
+        lastCo = null;
+        render();
+        tapCenterT = setTimeout(() => {
+          if (state.inner || state.sel !== id) return;
+          renderInspector();
+          el.insp.scrollTop = 0;
+          centerOn(id, false);
+        }, 280);
+      }
+    }
   }
   if (ptrs.size === 0) { gesture = null; el.viewport.classList.remove('panning'); rememberView(); }
   else if (ptrs.size === 1) { const [o] = [...ptrs.values()]; gesture = { type: 'pan', sx: o.x, sy: o.y, vx: view.x, vy: view.y, moved: true, target: null }; }
@@ -1739,10 +2161,26 @@ el.nodes.addEventListener('keydown', e => {
   if (!n || (e.key !== 'Enter' && e.key !== ' ')) return;
   e.preventDefault();
   const id = n.dataset.id;
+  if (e.key === 'Enter' && state.sel === id) { openInner(id); return; }   // Enter on a selected card opens it
   select(id);
   const again = el.nodes.querySelector(`.node[data-id="${CSS.escape(id)}"]`);
   if (again) again.focus({ preventScroll: true });
 });
+el.inodes.addEventListener('keydown', e => {
+  const c = e.target.closest('.inode');
+  if (!c || e.target.closest('[data-imedal]')) return;
+  const iid = c.dataset.iid;
+  if (e.key === 'Enter') { e.preventDefault(); if (iid === '__root' && state.isel === '__root') closeInner(); else selectInner(iid); }
+  else if (e.key === ' ' && iid !== '__root') { e.preventDefault(); iToggle(iid); }
+  else return;
+  const again = el.inodes.querySelector(`.inode[data-iid="${CSS.escape(iid)}"]`);
+  if (again) again.focus({ preventScroll: true });
+});
+el.inodes.addEventListener('click', e => {   // keyboard activation of a card's circle (pointer taps are handled on pointerup)
+  const med = e.target.closest('[data-imedal]');
+  if (med && e.detail === 0 && !med.disabled) iToggle(med.dataset.imedal);
+});
+el.crumbBack.addEventListener('click', () => closeInner());
 el.frontier.addEventListener('click', e => {
   if (e.target.closest('#frToggle')) { prefs.frontierOpen = !frontierOpen(); savePrefs(); renderFrontier(); return; }
   const g = e.target.closest('[data-goto]');
@@ -1753,12 +2191,8 @@ el.frontier.addEventListener('click', e => {
 el.insp.addEventListener('click', e => {
   const b = e.target.closest('button');
   const id = state.sel;
+  if (el.insp.dataset.mode === 'inner') { innerInspClick(b); return; }
   if (!b || !id) return;
-  if (b.dataset.ck) {
-    const item = b.closest('[data-item]').dataset.item;
-    if (b.dataset.ck === 'del') deleteItem(id, item); else if (b.dataset.ck === 'promote') promoteItem(id, item);
-    return;
-  }
   if (b.dataset.status) { setStatus(id, b.dataset.status); return; }
   if (b.dataset.type) { setType(id, b.dataset.type); return; }
   const tid = b.dataset.id;
@@ -1770,6 +2204,7 @@ el.insp.addEventListener('click', e => {
     case 'follow': addIdea('follow', 'task'); break;
     case 'routes': addRoutes(); break;
     case 'fold': foldNextLayer(id); break;
+    case 'open-inner': if (state.inner) selectInner(b.dataset.sid || null, { center: true }); else openInner(id, { selectSub: b.dataset.sid || null }); break;
     case 'parallel': addIdea('parallel'); break;
     case 'alt': addIdea('alt'); break;
     case 'up': move(id, -1); break;
@@ -1779,14 +2214,11 @@ el.insp.addEventListener('click', e => {
 });
 el.insp.addEventListener('change', e => {
   const t = e.target, id = state.sel;
-  if (!id) return;
-  if (t.dataset.ck === 'toggle') {
-    const item = t.closest('[data-item]').dataset.item;
-    toggleItem(id, item, t.checked);
-    const again = $('ck-' + item);
-    if (again) again.focus({ preventScroll: true });
+  if (el.insp.dataset.mode === 'inner') {
+    if (t.dataset.iparent && state.isel) iReparent(state.isel, t.value || null);
     return;
   }
+  if (!id) return;
   if (t.dataset.add) {
     if (!t.value) return;
     if (t.dataset.add === 'pre') linkPrereq(id, t.value); else addAlt(id, t.value);
@@ -1796,9 +2228,11 @@ el.insp.addEventListener('change', e => {
 });
 el.insp.addEventListener('input', e => {
   const t = e.target, f = t.dataset.f, id = state.sel;
-  if (t.dataset.ck === 'text' && id) {
-    const item = t.closest('[data-item]').dataset.item;
-    mutate(p => { const it = p.nodes[id].checklist.find(c => c.id === item); if (it) it.text = t.value; p.nodes[id].updated = nowISO(); }, { co: 'ck' + item, delay: 700 });
+  if (el.insp.dataset.mode === 'inner') {
+    const n = innerTech(), sid = state.isel, field = t.dataset.if;
+    if (!n || !sid || !field) return;
+    const v = field === 'text' ? t.value.replace(/\s*\n\s*/g, ' ') : t.value;
+    mutate(p => { const x = findSub(p.nodes[n.id], sid); if (x) x[field] = v; p.nodes[n.id].updated = nowISO(); }, { co: 'i' + field + sid, delay: 700 });
     return;
   }
   if (!f || !id) return;
@@ -1821,7 +2255,16 @@ el.insp.addEventListener('input', e => {
 el.insp.addEventListener('keydown', e => {
   const t = e.target;
   if (e.key !== 'Enter') return;
-  if (t.id === 'f-title') { e.preventDefault(); t.blur(); }
+  if (t.id === 'f-title' || t.id === 'if-text') { e.preventDefault(); t.blur(); }
+  else if (t.id === 'if-new' && state.inner && state.isel) {
+    e.preventDefault();
+    const text = t.value.trim();
+    if (!text) return;
+    addSub(state.inner.id, state.isel, text);
+    renderInspector();
+    const again = $('if-new');   // keep typing subtasks one after another
+    if (again) again.focus({ preventScroll: true });
+  }
   else if (t.id === 'ck-new' && state.sel) {
     e.preventDefault();
     const text = t.value.trim();
@@ -1829,12 +2272,26 @@ el.insp.addEventListener('keydown', e => {
     addItem(state.sel, text);
     const again = $('ck-new');   // keep typing items one after another
     if (again) again.focus({ preventScroll: true });
-  } else if (t.dataset.ck === 'text') { e.preventDefault(); const nx = $('ck-new'); if (nx) nx.focus(); }
+  }
 });
+function innerInspClick(b) {
+  const sid = state.isel;
+  if (!b || !sid) return;
+  if (b.dataset.istatus) { iSetStatus(sid, b.dataset.istatus); return; }
+  const n = innerTech(), x = n && findSub(n, sid);
+  switch (b.dataset.ia) {
+    case 'close': selectInner(null); break;
+    case 'goto': selectInner(b.dataset.sid, { center: true }); break;
+    case 'child': iAdd(sid); break;
+    case 'sibling': if (x) iAdd(x.parent); break;
+    case 'promote': iPromote(sid); break;
+    case 'del': iDelete(sid); break;
+  }
+}
 el.insp.addEventListener('focusout', () => { lastCo = null; });
 
 el.projSel.addEventListener('change', () => openProject(el.projSel.value));
-el.addBtn.addEventListener('click', () => addIdea(state.sel ? 'follow' : 'root'));
+el.addBtn.addEventListener('click', () => (state.inner ? iAdd(state.isel && state.isel !== '__root' ? state.isel : null) : addIdea(state.sel ? 'follow' : 'root')));
 el.undoBtn.addEventListener('click', undo);
 el.zIn.addEventListener('click', () => zoomCenter(1.2));
 el.zOut.addEventListener('click', () => zoomCenter(1 / 1.2));
@@ -1890,11 +2347,11 @@ function outline(p) {
   const lay = computeLayout(p), der = computeDerived(p), N = p.nodes, lines = [`# ${p.name}`, ''];
   const walk = (id, depth) => {
     const n = N[id], pad = '  '.repeat(depth), tags = [];
-    if (der[id] !== 'done') tags.push(dsLabel(der[id], n).toLowerCase() + (n.status === 'active' && !isRoute(n) ? ` ${n.progress}%` : ''));
+    if (der[id] !== 'done') tags.push(dsLabel(der[id], n).toLowerCase() + (n.status === 'active' && !isRoute(n) && !subOf(p, id).total ? ` ${n.progress}%` : ''));
     if (isRoute(n)) { const t = tally(p, id, lay, der); if (t.total) tags.push(`${t.done}/${t.total} tasks done`); }
     else {
       const sb = subOf(p, id);
-      if (sb.total && n.status !== 'done') tags.push(`${sb.done}/${sb.total} checklist items ticked`);
+      if (sb.total && n.status !== 'done') tags.push(`${sb.done}/${sb.total} tasks inside done`);
       if (n.effort != null) tags.push('~' + fmtEff(n.effort));
     }
     const extra = n.prereqs.filter(q => q !== lay.parent[id]);
@@ -1903,7 +2360,8 @@ function outline(p) {
     lines.push(`${pad}- [${n.status === 'done' ? 'x' : ' '}] ${isRoute(n) ? 'Route: ' : ''}${n.title}${tags.length ? ` (${tags.join(', ')})` : ''}`);
     if (n.notes.trim()) lines.push(`${pad}  ${isRoute(n) ? 'Hypothesis' : 'Plan'}: ${n.notes.trim().replace(/\s*\n\s*/g, ' ')}`);
     if (n.findings.trim()) lines.push(`${pad}  ${isRoute(n) ? 'Evidence' : 'Findings'}: ${n.findings.trim().replace(/\s*\n\s*/g, ' ')}`);
-    n.checklist.forEach(c => lines.push(`${pad}  - [${c.done ? 'x' : ' '}] ${c.text}`));
+    const walkSub = (pid, d) => kidsOf(n, pid).forEach(x => { lines.push(`${pad}${'  '.repeat(d)}- [${x.status === 'done' ? 'x' : ' '}] ${x.text}${x.status === 'active' ? ' (in progress)' : x.status === 'dropped' ? ' (dropped)' : ''}`); walkSub(x.id, d + 1); });
+    walkSub(null, 1);
     (lay.kids[id] || []).forEach(c => walk(c, depth + 1));
   };
   lay.roots.forEach(r => walk(r, 0));
@@ -2016,7 +2474,9 @@ const CUES = {
   done: [[783.99, 0], [1046.5, 0.09]],                                   // G5 then C6
   complete: [[523.25, 0], [659.25, 0.08], [783.99, 0.16], [1046.5, 0.26]], // C major arpeggio
   adopt: [[392, 0], [587.33, 0.1], [783.99, 0.2]],                       // G4 D5 G5, an open fifth
-  tick: [[1318.51, 0]],                                                  // E6, a soft tick for a checklist item
+  tick: [[1318.51, 0]],                                                  // E6, a soft tick for a finished subtask
+  open: [[392, 0], [587.33, 0.07]],                                      // G4 D5, rising into a card
+  close: [[587.33, 0], [392, 0.07]],                                     // and falling back out
 };
 function bell(freq, at, dur, vol) {
   // A sine fundamental plus two quickly fading inharmonic partials reads as a small bell.
@@ -2046,7 +2506,7 @@ function play(cue) {
     }
     if (actx.state === 'suspended') actx.resume();
     const t0 = actx.currentTime + 0.02, notes = CUES[cue];
-    const soft = cue === 'tick';
+    const soft = cue === 'tick' || cue === 'open' || cue === 'close';
     notes.forEach(([f, d], i) => bell(f, t0 + d, soft ? 0.3 : i === notes.length - 1 ? 1.1 : 0.55, soft ? 0.22 : 0.5));
   } catch (e) { /* no audio in this view */ }
 }
@@ -2068,11 +2528,20 @@ document.addEventListener('keydown', e => {
     if (!el.modal.hidden) closeModal();
     else if (!el.projPop.hidden) closePop();
     else if (typing) t.blur();
+    else if (state.inner) { if (state.isel) selectInner(null); else closeInner(); }
     else if (state.sel) select(null);
     return;
   }
   if (typing || e.ctrlKey || e.metaKey || e.altKey || !el.modal.hidden || !cur()) return;
   const k = e.key.toLowerCase();
+  if (state.inner) {
+    const n = innerTech(), x = n && state.isel && state.isel !== '__root' ? findSub(n, state.isel) : null;
+    if (k === 'f') { e.preventDefault(); fit(); }
+    else if (k === 'n') { e.preventDefault(); iAdd(x ? x.id : null); }
+    else if (k === 'p' && x) { e.preventDefault(); iAdd(x.parent); }
+    else if ((e.key === 'Delete' || e.key === 'Backspace') && x) { e.preventDefault(); iDelete(x.id); }
+    return;
+  }
   if (k === 'f') { e.preventDefault(); fit(); }
   else if (k === 'n') { e.preventDefault(); addIdea(state.sel ? 'follow' : 'root', 'task'); }
   else if (k === 'r') { e.preventDefault(); addRoutes(); }
