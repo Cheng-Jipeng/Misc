@@ -328,7 +328,22 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
 .type-seg button[data-type="route"].on { background: var(--route); }
 .routebox { display: grid; gap: 4px; padding: 10px 12px; border-radius: 8px; background: var(--route-soft); }
 .routebox p { margin: 0; font-size: 13px; }
-.routebox.subbox { background: var(--surface-2); border: 1px solid var(--line); }
+.cklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.ck-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 4px 6px; padding: 2px 4px; border-radius: 6px; }
+.ck-item:hover { background: var(--surface-2); }
+.ck-item input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.ck-text { min-width: 0; padding: 4px 6px; border: 1px solid transparent; border-radius: 5px; background: transparent; font-size: 13px; }
+.ck-text:hover:not(:disabled) { border-color: var(--line); }
+.ck-text:focus { border-color: var(--active); background: var(--surface); outline: none; }
+.ck-item.done .ck-text { color: var(--muted); text-decoration: line-through; }
+.ck-btn { width: 24px; height: 24px; border: 0; border-radius: 5px; background: none; color: var(--muted); font-size: 14px; line-height: 1; opacity: 0; }
+.ck-item:hover .ck-btn, .ck-item:focus-within .ck-btn { opacity: 1; }
+@media (hover: none) { .ck-btn { opacity: 1; } }
+.ck-btn:hover { background: var(--surface-2); color: var(--ink); }
+.ck-btn[data-ck="del"]:hover { background: var(--drop-soft); color: var(--drop); }
+.ck-note { grid-column: 2 / -1; margin: 0 0 2px 6px; font-size: 11.5px; color: var(--muted); }
+.ck-new { width: 100%; font-size: 13px; }
+.ck .btn.sm { justify-self: start; }
 .cmp-wrap { overflow-x: auto; }
 .cmp { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .cmp th { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); font: 600 10px/1.3 var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
@@ -472,9 +487,10 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
 const W = 236, H = 84, GAP = 64, COLW = W + GAP, ROWH = 104, PADX = 56, PADY = 52;
 const KMIN = 0.3, KMAX = 1.8;
 const STATUSES = ['todo', 'active', 'done', 'dropped'];
-// A task is work you finish; a route is a direction you explore. Starting either opens its next layer.
-// A task completes itself once that whole layer is done; a route is only ever adopted by hand,
-// and adopting it (a route's "done") supersedes its alternatives.
+// The tree is a tech tree: a line means "this must be done before that". A task is a step: what
+// follows it unlocks once it is done, and its checklist holds the work inside it, completing it when
+// every item is ticked. A route is one of several competing directions: exploring it opens its
+// branch, and only adopting it (a route's "done"), by hand, supersedes the others.
 const STATUS_LABEL = {
   task: { todo: 'Not started', active: 'Researching', done: 'Done', dropped: 'Dropped' },
   route: { todo: 'Not explored', active: 'Exploring', done: 'Adopted', dropped: 'Abandoned' },
@@ -482,10 +498,10 @@ const STATUS_LABEL = {
 const DS_LABEL = { done: 'Done', active: 'Researching', available: 'Available', locked: 'Locked', superseded: 'Superseded', blocked: 'Cut off', dropped: 'Dropped' };
 const ROUTE_DS_LABEL = { done: 'Adopted', active: 'Exploring', available: 'Ready to explore', dropped: 'Abandoned' };
 const LEGEND_LABEL = { done: 'Done / adopted', active: 'Researching / exploring', dropped: 'Dropped / abandoned' };
-const ROUTE_HELP = 'A task is work you finish: starting it opens its next layer, and it completes itself once that layer is done. A route is a direction you explore: only adopting it, by hand, supersedes its alternatives.';
+const ROUTE_HELP = 'A task is a step: what follows it unlocks once it is done, and its checklist holds the work inside it. A route is one of several competing directions: exploring it opens its branch, and adopting it supersedes the others.';
 const isRoute = n => !!n && n.type === 'route';
 const dsLabel = (ds, n) => (isRoute(n) && ROUTE_DS_LABEL[ds]) || DS_LABEL[ds];
-const satisfies = n => n.status === 'done' || n.status === 'active';
+const satisfies = n => n.status === 'done' || (n.type === 'route' && n.status === 'active');
 const DS_ORDER = ['done', 'active', 'available', 'locked', 'superseded', 'blocked', 'dropped'];
 const KINDS = ['Model', 'Calibration', 'Data', 'Estimation', 'Robustness', 'Writing', 'Other'];
 const DATA_KEY = 'research-tech-tree:data:v1';
@@ -553,11 +569,17 @@ function normNode(id, r, i) {
     status: STATUSES.includes(r.status) ? r.status : 'todo',
     kind: KINDS.includes(r.kind) ? r.kind : 'Other',
     type: r.type === 'route' ? 'route' : 'task',
-    autoDone: r.autoDone === true && r.status === 'done',   // completed by its next layer, not by hand
+    autoDone: r.autoDone === true && r.status === 'done',   // completed by ticking its checklist, not by hand
     effort: Number.isFinite(eff) && eff >= 0 ? eff : null,
     progress: clamp(Math.round(Number(r.progress) || 0), 0, 100),
     prereqs: Array.isArray(r.prereqs) ? r.prereqs.filter(x => typeof x === 'string') : [],
     alts: Array.isArray(r.alts) ? r.alts.filter(x => typeof x === 'string') : [],
+    checklist: Array.isArray(r.checklist) ? r.checklist.filter(c => c && typeof c === 'object').map(c => ({
+      id: typeof c.id === 'string' && /^[\w-]{1,40}$/.test(c.id) ? c.id : uid('c'),
+      text: typeof c.text === 'string' ? c.text : '',
+      done: c.done === true,
+      note: typeof c.note === 'string' ? c.note : '',
+    })) : [],
     seq: Number.isFinite(Number(r.seq)) && r.seq !== null && r.seq !== '' ? Number(r.seq) : i,
     created: typeof r.created === 'string' ? r.created : t,
     updated: typeof r.updated === 'string' ? r.updated : t,
@@ -660,9 +682,10 @@ function tally(p, id, lay = L, der = D) {
     const c = stack.pop();
     if (seen.has(c)) continue;
     seen.add(c);
-    stack.push(...(lay.children[c] || []));
     const m = p.nodes[c];
-    if (isRoute(m) || der[c] === 'dropped' || der[c] === 'superseded' || der[c] === 'blocked') continue;
+    if (isRoute(m)) continue;   // a nested route is a branch of its own
+    stack.push(...(lay.children[c] || []));
+    if (der[c] === 'dropped' || der[c] === 'superseded' || der[c] === 'blocked') continue;
     t.total++;
     if (m.status === 'done') { t.done++; continue; }
     if (m.status === 'active') t.active++;
@@ -731,11 +754,10 @@ function computeLayout(p) {
   };
 }
 
-// The next layer of a task, which its ring and auto-completion follow. Dropped, superseded and
-// cut-off ideas do not count toward the load.
-function subOf(p, id, lay = L, der = D) {
-  const kids = (lay.children[id] || []).filter(c => der[c] !== 'dropped' && der[c] !== 'superseded' && der[c] !== 'blocked');
-  return { total: kids.length, done: kids.filter(c => p.nodes[c].status === 'done').length };
+// A task's checklist, which its ring, its counts and its auto-completion follow.
+function subOf(p, id) {
+  const c = p.nodes[id].checklist;
+  return { total: c.length, done: c.filter(x => x.done).length };
 }
 
 // ---------- the example tree (opened the first time the local file runs)
@@ -913,11 +935,33 @@ function addIdea(kind, type) {
       grp.forEach(g => { p.nodes[g].alts = uniq([...p.nodes[g].alts, n.id]); });
     }
     newId = n.id;
-    // The first idea to open a new tier stamps that tier with today's date; later ones leave it alone.
-    const d = computeLayout(p).pos[n.id].d;
-    if (d >= tiersBefore) p.tierDates = { ...(p.tierDates || {}), [d]: todayISO() };
+    stampTier(p, n.id, tiersBefore);
   });
   if (newId) select(newId, { center: true, focus: true });
+}
+// The first idea to open a new tier stamps that tier with today's date; later ones leave it alone.
+function stampTier(p, nodeId, tiersBefore) {
+  const d = computeLayout(p).pos[nodeId].d;
+  if (d >= tiersBefore) p.tierDates = { ...(p.tierDates || {}), [d]: todayISO() };
+}
+// Routes come in competing sets, so they are added as a pair that branches from the selection.
+function addRoutes() {
+  const p = cur();
+  if (!p || state.readOnly) return;
+  const base = state.sel ? p.nodes[state.sel] : null;
+  let first = null;
+  mutate(p => {
+    const tiersBefore = L ? L.maxDepth + 1 : 0;
+    const a = makeNode({ type: 'route', title: 'Route A', kind: base ? base.kind : 'Other', prereqs: base ? [base.id] : [] });
+    const b = makeNode({ type: 'route', title: 'Route B', kind: a.kind, prereqs: a.prereqs.slice() });
+    insertNode(p, a, null);
+    insertNode(p, b, a.id);
+    a.alts = [b.id];
+    b.alts = [a.id];
+    stampTier(p, a.id, tiersBefore);
+    first = a.id;
+  });
+  if (first) select(first, { center: true, focus: true });
 }
 function deleteNode(id) {
   const p = cur();
@@ -936,61 +980,37 @@ function deleteNode(id) {
   toast(`Deleted “${trunc(n.title, 40)}”`, { action: 'Undo', onAction: undo });
 }
 let fx = {};   // one-shot animation classes for the next canvas render
-// Walk up from the given parents: a task whose whole next layer is done completes itself, and one that
-// completed that way reopens when part of its layer reopens. Routes are left for the user to adopt.
-function rollUp(p, parentIds) {
-  const done = [], reopened = [], seen = new Set(), queue = [...parentIds];
-  while (queue.length) {
-    const pid = queue.shift();
-    if (seen.has(pid)) continue;
-    seen.add(pid);
-    const par = p.nodes[pid];
-    if (!par || isRoute(par) || par.status === 'dropped') continue;
-    const der = computeDerived(p);
-    const kids = Object.values(p.nodes).filter(m => m.prereqs.includes(pid) && der[m.id] !== 'dropped' && der[m.id] !== 'superseded' && der[m.id] !== 'blocked');
-    const all = kids.length > 0 && kids.every(m => m.status === 'done');
-    if (all && par.status !== 'done') { par.status = 'done'; par.autoDone = true; done.push(pid); }
-    else if (!all && par.status === 'done' && par.autoDone) { par.status = 'active'; par.autoDone = false; reopened.push(pid); }
-    else continue;
-    par.updated = nowISO();
-    queue.push(...par.prereqs);
-  }
-  return { done, reopened };
+// A checklist completes its task once every item is ticked, and reopens a task it completed when an
+// item is unticked or added. A task marked done by hand is left alone.
+function settleChecklist(n) {
+  if (isRoute(n) || !n.checklist.length) return null;
+  const all = n.checklist.every(c => c.done);
+  if (all && n.status !== 'done' && n.status !== 'dropped') { n.status = 'done'; n.autoDone = true; return 'completed'; }
+  if (!all && n.status === 'done' && n.autoDone) { n.status = 'active'; n.autoDone = false; return 'reopened'; }
+  return null;
 }
-function setStatus(id, s) {
-  const p = cur();
-  if (!p || !p.nodes[id] || p.nodes[id].status === s || state.readOnly) return;
-  const was = { ...D }, route = isRoute(p.nodes[id]);
-  let roll = { done: [], reopened: [] };
-  mutate(p => {
-    const n = p.nodes[id];
-    n.status = s;
-    n.autoDone = false;
-    n.updated = nowISO();
-    roll = rollUp(p, n.prereqs);
-  }, { insp: true });
-  const N = cur().nodes;
+// Chime, animate and report what a change to one idea did to the rest of the tree.
+function feedback(id, was, { completed = false, reopened = false, ticked = false } = {}) {
+  const N = cur().nodes, n = N[id];
+  if (!n) return;
   const names = ids => { const a = ids.map(k => `“${trunc(N[k].title, 30)}”`); return a.slice(0, 3).join(', ') + (a.length > 3 ? ` and ${a.length - 3} more` : ''); };
-  const changedTo = st => Object.keys(D).filter(k => k !== id && D[k] === st && was[k] !== st && !roll.done.includes(k));
+  const changedTo = st => Object.keys(D).filter(k => k !== id && D[k] === st && was[k] !== st);
   const opened = changedTo('available'), sup = changedTo('superseded');
-
-  if (s === 'done') fx[id] = 'fx-done';
-  for (const q of N[id].prereqs) if (N[q] && !isRoute(N[q]) && N[q].status === 'active') fx[q] = 'fx-tick';
-  roll.reopened.forEach(k => { fx[k] = 'fx-tick'; });
-  roll.done.forEach(k => { fx[k] = 'fx-cascade'; });
+  const doneNow = n.status === 'done' && was[id] !== 'done';
+  if (doneNow) fx[id] = 'fx-done'; else if (ticked || reopened) fx[id] = 'fx-tick';
   opened.forEach(k => { fx[k] = fx[k] || 'fx-unlock'; });
   render();
-  if (roll.done.length) play('complete');
-  else if (s === 'done') play(route ? 'adopt' : 'done');
+  if (doneNow) play(isRoute(n) ? 'adopt' : completed ? 'complete' : 'done');
+  else if (ticked) play('tick');
 
   const msg = [];
-  if (roll.done.length) msg.push(`Completed ${names(roll.done)}, because ${roll.done.length > 1 ? 'their next layers are' : 'its next layer is'} all done.`);
-  if (roll.reopened.length) msg.push(`Reopened ${names(roll.reopened)}, since part of ${roll.reopened.length > 1 ? 'their' : 'its'} next layer is open again.`);
+  if (completed) msg.push(`Completed “${trunc(n.title, 30)}”: every checklist item is ticked.`);
+  if (reopened) msg.push(`Reopened “${trunc(n.title, 30)}”, since its checklist has an open item again.`);
   if (opened.length) msg.push(`Unlocked ${names(opened)}.`);
   if (sup.length) msg.push(`Superseded ${names(sup)}.`);
   // A route whose tasks are all finished is ready for a decision: offer it, never make it.
   let nudge = null;
-  if (s === 'done' && !route) {
+  if (doneNow && !isRoute(n)) {
     nudge = [...ancestors(cur(), id)].find(k => {
       if (!isRoute(N[k]) || N[k].status !== 'active') return false;
       const t = tally(cur(), k);
@@ -1001,6 +1021,88 @@ function setStatus(id, s) {
     msg.push(`Every task under “${trunc(N[nudge].title, 30)}” is done.`);
     toast(msg.join(' '), { action: 'Adopt route', onAction: () => setStatus(nudge, 'done') });
   } else if (msg.length) toast(msg.join(' '));
+}
+function setStatus(id, s) {
+  const p = cur();
+  if (!p || !p.nodes[id] || p.nodes[id].status === s || state.readOnly) return;
+  const was = { ...D };
+  mutate(p => { const n = p.nodes[id]; n.status = s; n.autoDone = false; n.updated = nowISO(); }, { insp: true });
+  feedback(id, was);
+}
+
+// ---------- checklists: the work inside a task
+function editChecklist(id, fn, { ticked = false } = {}) {
+  const p = cur();
+  if (!p || !p.nodes[id] || isRoute(p.nodes[id]) || state.readOnly) return null;
+  const was = { ...D };
+  let result = null;
+  mutate(p => { const n = p.nodes[id]; fn(n); n.updated = nowISO(); result = settleChecklist(n); }, { insp: true });
+  if (result || ticked) feedback(id, was, { completed: result === 'completed', reopened: result === 'reopened', ticked });
+  return result;
+}
+function toggleItem(id, itemId, done) {
+  editChecklist(id, n => {
+    const it = n.checklist.find(c => c.id === itemId);
+    if (!it) return;
+    it.done = done;
+    if (done && n.status === 'todo') n.status = 'active';   // ticking the first item starts the task
+  }, { ticked: done });
+}
+function addItem(id, text) {
+  editChecklist(id, n => { n.checklist.push({ id: uid('c'), text, done: false, note: '' }); });
+}
+function deleteItem(id, itemId) {
+  const it = cur().nodes[id].checklist.find(c => c.id === itemId);
+  editChecklist(id, n => { n.checklist = n.checklist.filter(c => c.id !== itemId); });
+  if (it) toast(`Deleted “${trunc(it.text || 'item', 40)}”`, { action: 'Undo', onAction: undo });
+}
+// An item that turns out to have follow-ups of its own becomes a card right after its task.
+function promoteItem(id, itemId) {
+  const p = cur(), par = p && p.nodes[id], it = par && par.checklist.find(c => c.id === itemId);
+  if (!it || state.readOnly) return;
+  const was = { ...D };
+  let newId = null, result = null;
+  mutate(p => {
+    const tiersBefore = L ? L.maxDepth + 1 : 0;
+    const n = p.nodes[id];
+    n.checklist = n.checklist.filter(c => c.id !== itemId);
+    const m = makeNode({ title: it.text || 'Untitled idea', notes: it.note, status: it.done ? 'done' : 'todo', kind: n.kind, prereqs: [id] });
+    insertNode(p, m, null);
+    stampTier(p, m.id, tiersBefore);
+    n.updated = nowISO();
+    result = settleChecklist(n);
+    newId = m.id;
+  }, { insp: true });
+  fx[newId] = 'fx-unlock';
+  if (result) feedback(id, was, { completed: result === 'completed', reopened: result === 'reopened' });
+  else render();
+  toast(`Moved “${trunc(it.text, 30)}” to its own card after “${trunc(par.title, 30)}”.`, { action: 'Undo', onAction: undo });
+}
+// Follow-ups that are really parts of a task (single-parent tasks with nothing after them) can be
+// folded into its checklist. This is how trees from before checklists existed are tidied up.
+function foldable(p, id) {
+  const all = Object.values(p.nodes);
+  return all.filter(m => m.prereqs.length === 1 && m.prereqs[0] === id && !isRoute(m) && !m.alts.length
+    && !m.checklist.length && !all.some(k => k.prereqs.includes(m.id))).sort((a, b) => a.seq - b.seq);
+}
+function foldNextLayer(id) {
+  const p = cur(), n = p && p.nodes[id];
+  if (!n || isRoute(n) || state.readOnly) return;
+  const kids = foldable(p, id);
+  if (!kids.length) return;
+  const was = { ...D };
+  let result = null;
+  mutate(p => {
+    const t = p.nodes[id];
+    for (const m of kids) {
+      t.checklist.push({ id: uid('c'), text: m.title, done: m.status === 'done', note: [m.notes, m.findings].map(x => x.trim()).filter(Boolean).join(' · ') });
+      delete p.nodes[m.id];
+    }
+    t.updated = nowISO();
+    result = settleChecklist(t);
+  }, { insp: true });
+  if (result) feedback(id, was, { completed: result === 'completed' });
+  toast(`Moved ${kids.length} follow-up${kids.length > 1 ? 's' : ''} into the checklist of “${trunc(n.title, 30)}”.${result === 'completed' ? ' Every item is ticked, so it is done.' : ''}`, { action: 'Undo', onAction: undo });
 }
 function setType(id, type) {
   const p = cur();
@@ -1206,6 +1308,8 @@ function renderWorld(p) {
       if (t.total) meta.push(`<span title="Tasks under this route that are done">${t.done}/${t.total}</span>`);
     } else {
       meta.push(`<span class="kind">${esc(n.kind)}</span>`);
+      const ck = subOf(p, n.id);
+      if (ck.total && n.status !== 'active' && n.status !== 'done') meta.push(`<span title="Checklist items ticked">&#10003;&thinsp;${ck.done}/${ck.total}</span>`);
       if (n.effort != null) meta.push(`<span title="Estimated effort">~${fmtEff(n.effort)}</span>`);
     }
     if (unl) meta.push(`<span title="Unlocks ${unl} idea${unl > 1 ? 's' : ''}">&rarr;&thinsp;${unl}</span>`);
@@ -1305,9 +1409,9 @@ function renderFrontier() {
     + `<div class="fr-summary"><div class="fr-bar">${bar}</div><div class="fr-stats"><span class="num">${doneTasks}</span> of <span class="num">${tasks.length}</span> tasks done${routesOpen.length ? ` · <span class="num">${routesOpen.length}</span> route${routesOpen.length > 1 ? 's' : ''} open` : ''}${dropped ? ` · <span class="num">${dropped}</span> dropped` : ''}</div></div>`
     + (routesOpen.length ? `<h3 class="fr-h">Open routes</h3>${routesOpen.map(item).join('')}` : '')
     + `<h3 class="fr-h">Researching</h3>${act.length ? act.map(item).join('') : '<p class="fr-none">Nothing in progress. Start one of the available ideas.</p>'}`
-    + `<h3 class="fr-h">Available</h3>${av.length ? av.map(item).join('') : '<p class="fr-none">Nothing is unlocked right now. Start a task or explore a route to open the ideas after it.</p>'}`
+    + `<h3 class="fr-h">Available</h3>${av.length ? av.map(item).join('') : '<p class="fr-none">Nothing is unlocked right now. Finish a task or explore a route to open what comes next.</p>'}`
     + `<div class="legend">${DS_ORDER.map(s => `<span><i class="dot s-${s}"></i>${LEGEND_LABEL[s] || DS_LABEL[s]}</span>`).join('')}<span><i class="dot shape"></i>Task</span><span><i class="dot shape route"></i>Route</span></div>`
-    + '<p class="keys edit-only"><kbd>N</kbd> task · <kbd>R</kbd> route · <kbd>P</kbd> parallel · <kbd>F</kbd> fit · <kbd>Del</kbd> delete · <kbd>Ctrl Z</kbd> undo. Drag the dot on a card\'s right edge onto another card to link them.</p>'
+    + '<p class="keys edit-only"><kbd>N</kbd> task · <kbd>R</kbd> competing routes · <kbd>P</kbd> parallel · <kbd>F</kbd> fit · <kbd>Del</kbd> delete · <kbd>Ctrl Z</kbd> undo. Drag the dot on a card\'s right edge onto another card to link them.</p>'
     + '</div>';
   const nb = el.frontier.querySelector('.fr-body');
   if (nb) nb.scrollTop = scroll;
@@ -1319,16 +1423,16 @@ function why(p, n, ds) {
   switch (ds) {
     case 'done':
       if (route) return `Adopted.${n.alts.length ? ' Its alternatives are superseded.' : ''}${n.findings ? '' : ' Record why under Evidence.'}`;
-      return (n.autoDone ? 'Done automatically, because its whole next layer is finished.' : 'Done.') + (n.findings ? '' : ' Note what you learned under Findings.');
+      return (n.autoDone ? 'Done automatically, because every checklist item is ticked.' : 'Done.') + (n.findings ? '' : ' Note what you learned under Findings.');
     case 'active':
-      if (route) return `Exploring, so its follow-ups are open. Mark it Adopted once the evidence favors it${n.alts.length ? '; that supersedes its alternatives' : ''}.`;
-      { const sub = subOf(p, n.id); return sub.total ? `In progress. Its next layer is open, and it completes itself once all ${sub.total} are done.` : `In progress, ${n.progress}% along.`; }
+      if (route) return `Exploring, so the tasks in its branch are open. Mark it Adopted once the evidence favors it${n.alts.length ? '; that supersedes its alternatives' : ''}.`;
+      { const sub = subOf(p, n.id); return sub.total ? `In progress: ${sub.done} of ${sub.total} checklist items ticked. It completes itself when the last one is.` : `In progress, ${n.progress}% along.`; }
     case 'available':
       if (route) return n.prereqs.length ? 'All prerequisites are met. Set it to Exploring to open its follow-ups.' : 'A starting route. Set it to Exploring to open its follow-ups.';
       return n.prereqs.length ? 'All prerequisites are met. Ready to start.' : 'A starting point with no prerequisites. Ready to start.';
     case 'locked': {
       const w = n.prereqs.filter(id => !satisfies(N[id]));
-      return `Locked. Waiting for ${joinAnd(w.map(id => q(id) + (isRoute(N[id]) ? ' to be explored' : ' to be started')))}.`;
+      return `Locked. Waiting for ${joinAnd(w.map(id => q(id) + (isRoute(N[id]) ? ' to be explored' : ' to be done')))}.`;
     }
     case 'superseded': {
       const w = n.alts.filter(a => N[a].status === 'done');
@@ -1355,22 +1459,30 @@ function pathInfo(p, n) {
     + (open.length ? '<p class="hint">The blue lines on the tree trace it.</p>' : '')
     + '</div>';
 }
-function subBox(n, sub) {
-  if (!sub.total) return '';
-  const left = sub.total - sub.done;
-  const tail = n.status === 'done'
-    ? (n.autoDone ? ' · it was marked done when the last one finished' : '')
-    : n.status === 'dropped' || !left ? '' : ` · it completes itself once the remaining ${left === 1 ? 'one is' : left + ' are'} done`;
-  return `<div class="routebox subbox"><span class="lbl">Next layer</span><p><b class="num">${sub.done}</b> of <b class="num">${sub.total}</b> done${tail}</p></div>`;
+function checklistBox(p, n) {
+  const sub = subOf(p, n.id), ro = state.readOnly ? ' disabled' : '';
+  const items = n.checklist.map(c => `<li class="ck-item${c.done ? ' done' : ''}" data-item="${esc(c.id)}">`
+    + `<input type="checkbox" id="ck-${esc(c.id)}" data-ck="toggle"${c.done ? ' checked' : ''}${ro} aria-label="Ticked: ${esc(c.text || 'item')}">`
+    + `<input class="ck-text" id="ckt-${esc(c.id)}" data-ck="text" value="${esc(c.text)}" maxlength="200" aria-label="Checklist item"${ro}>`
+    + (state.readOnly ? '' : '<button class="ck-btn" data-ck="promote" title="Move to its own card after this task" aria-label="Move to its own card">&#8599;</button><button class="ck-btn" data-ck="del" title="Delete item" aria-label="Delete item">&times;</button>')
+    + (c.note ? `<p class="ck-note">${esc(c.note)}</p>` : '')
+    + '</li>').join('');
+  const fold = state.readOnly ? [] : foldable(p, n.id);
+  return `<section class="field ck"><h4 class="lbl">Checklist${sub.total ? ` <span class="num">${sub.done}/${sub.total}</span>` : ''}</h4>`
+    + (items ? `<ul class="cklist">${items}</ul>` : '')
+    + (state.readOnly ? '' : '<input class="inp ck-new" id="ck-new" maxlength="200" placeholder="Add an item and press Enter" aria-label="New checklist item">')
+    + `<p class="hint">${sub.total ? 'When every item is ticked, this task completes itself and unlocks what follows it.' : 'Break the work inside this task into items. Ticking the last one completes the task.'}</p>`
+    + (fold.length ? `<button class="btn sm" data-act="fold" title="Simple follow-ups (one parent, nothing after them) become checklist items">Fold ${fold.length} follow-up${fold.length > 1 ? 's' : ''} into this checklist</button>` : '')
+    + '</section>';
 }
 function routeBox(p, n) {
   const t = tally(p, n.id);
-  if (!t.total) return '<div class="routebox"><span class="lbl">Tasks under this route</span><p>None yet. Add the work that would test this route with + Task below.</p></div>';
+  if (!t.total) return `<div class="routebox"><span class="lbl">Tasks under this route</span><p>None yet. Add the work that would test this route with + Task below.</p>${n.alts.length ? '' : '<p class="hint">A route is one of several competing directions. Add one with + Alternative, or switch this to a task.</p>'}</div>`;
   const bits = [`<b class="num">${t.done}</b> of <b class="num">${t.total}</b> done`];
   if (t.active) bits.push(`${t.active} researching`);
   if (t.left) bits.push(`<b class="num">~${fmtEff(t.left)}</b> left`);
   if (t.unest) bits.push(`${t.unest} without an estimate`);
-  return `<div class="routebox"><span class="lbl">Tasks under this route</span><p>${bits.join(' · ')}</p></div>`;
+  return `<div class="routebox"><span class="lbl">Tasks under this route</span><p>${bits.join(' · ')}</p>${n.alts.length ? '' : '<p class="hint">A route is one of several competing directions. Add one with + Alternative, or switch this to a task.</p>'}</div>`;
 }
 function compareAlts(p, n) {
   if (!n.alts.length) return '';
@@ -1407,7 +1519,7 @@ function renderInspector() {
     + `<div class="seg" role="group" aria-label="Status">${STATUSES.map(s => `<button data-status="${s}" class="${n.status === s ? 'on' : ''}" aria-pressed="${n.status === s}"${ro}>${STATUS_LABEL[type][s]}</button>`).join('')}</div>`
     + `<p class="why">${why(p, n, ds)}</p>`
     + (!route && n.status === 'active' && !sub.total ? `<div class="field"><label class="lbl" for="f-prog">Progress <span class="num" id="progVal">${n.progress}%</span></label><input id="f-prog" type="range" min="0" max="100" step="5" value="${n.progress}" data-f="progress"${ro}></div>` : '')
-    + (route ? routeBox(p, n) : subBox(n, sub))
+    + (route ? routeBox(p, n) : checklistBox(p, n))
     + `<div class="row2"><div class="field"><label class="lbl" for="f-kind">Kind</label><select id="f-kind" data-f="kind"${ro}>${KINDS.map(k => `<option${k === n.kind ? ' selected' : ''}>${k}</option>`).join('')}</select></div>`
     + (route ? '' : `<div class="field"><label class="lbl" for="f-eff">Effort, days</label><input id="f-eff" class="num" type="number" min="0" step="0.5" inputmode="decimal" data-f="effort" placeholder="Not estimated" value="${n.effort == null ? '' : n.effort}"${ro}></div>`)
     + '</div>'
@@ -1418,7 +1530,7 @@ function renderInspector() {
     + `<div class="field"><label class="lbl" for="f-notes">${route ? 'Hypothesis' : 'Plan'}</label><textarea id="f-notes" data-f="notes" rows="4" placeholder="${route ? 'What would have to be true for this route to work?' : 'What is the idea, and how would you test it?'}"${ro}>${esc(n.notes)}</textarea></div>`
     + `<div class="field"><label class="lbl" for="f-find">${route ? 'Evidence' : 'Findings'}</label><textarea id="f-find" data-f="findings" rows="3" placeholder="${route ? 'What do the results so far say for or against this route?' : 'What did you learn? Dead ends count too.'}"${ro}>${esc(n.findings)}</textarea></div>`
     + pathInfo(p, n)
-    + '<div class="add-row edit-only"><span class="lbl">Add after this</span><button class="btn" data-act="follow" title="A task that needs this first (N)">+ Task</button><button class="btn" data-act="follow-route" title="A direction that branches off from here (R)">+ Route</button></div>'
+    + '<div class="add-row edit-only"><span class="lbl">Add after this</span><button class="btn" data-act="follow" title="A task that needs this first (N)">+ Task</button><button class="btn" data-act="routes" title="Two competing directions that branch off from here (R)">+ Competing routes</button></div>'
     + '<div class="add-row edit-only"><span class="lbl">Add beside this</span><button class="btn" data-act="parallel" title="Same prerequisites, pursued alongside (P)">+ Parallel</button><button class="btn" data-act="alt" title="Same prerequisites, competing with this one">+ Alternative</button></div>'
     + '<div class="i-acts2 edit-only"><span class="lbl">Order</span><button class="btn sm" data-act="up" aria-label="Move up among siblings">&uarr;</button><button class="btn sm" data-act="down" aria-label="Move down among siblings">&darr;</button><span class="grow"></span><button class="btn danger" data-act="del">Delete</button></div>'
     + `<p class="i-meta">Added ${fmtDate(n.created)} · edited ${fmtDate(n.updated)}</p>`;
@@ -1642,6 +1754,11 @@ el.insp.addEventListener('click', e => {
   const b = e.target.closest('button');
   const id = state.sel;
   if (!b || !id) return;
+  if (b.dataset.ck) {
+    const item = b.closest('[data-item]').dataset.item;
+    if (b.dataset.ck === 'del') deleteItem(id, item); else if (b.dataset.ck === 'promote') promoteItem(id, item);
+    return;
+  }
   if (b.dataset.status) { setStatus(id, b.dataset.status); return; }
   if (b.dataset.type) { setType(id, b.dataset.type); return; }
   const tid = b.dataset.id;
@@ -1651,7 +1768,8 @@ el.insp.addEventListener('click', e => {
     case 'rmpre': mutate(p => { const m = p.nodes[id]; m.prereqs = m.prereqs.filter(x => x !== tid); }, { insp: true }); break;
     case 'rmalt': mutate(p => removeFromGroup(p, tid), { insp: true }); break;
     case 'follow': addIdea('follow', 'task'); break;
-    case 'follow-route': addIdea('follow', 'route'); break;
+    case 'routes': addRoutes(); break;
+    case 'fold': foldNextLayer(id); break;
     case 'parallel': addIdea('parallel'); break;
     case 'alt': addIdea('alt'); break;
     case 'up': move(id, -1); break;
@@ -1662,6 +1780,13 @@ el.insp.addEventListener('click', e => {
 el.insp.addEventListener('change', e => {
   const t = e.target, id = state.sel;
   if (!id) return;
+  if (t.dataset.ck === 'toggle') {
+    const item = t.closest('[data-item]').dataset.item;
+    toggleItem(id, item, t.checked);
+    const again = $('ck-' + item);
+    if (again) again.focus({ preventScroll: true });
+    return;
+  }
   if (t.dataset.add) {
     if (!t.value) return;
     if (t.dataset.add === 'pre') linkPrereq(id, t.value); else addAlt(id, t.value);
@@ -1671,6 +1796,11 @@ el.insp.addEventListener('change', e => {
 });
 el.insp.addEventListener('input', e => {
   const t = e.target, f = t.dataset.f, id = state.sel;
+  if (t.dataset.ck === 'text' && id) {
+    const item = t.closest('[data-item]').dataset.item;
+    mutate(p => { const it = p.nodes[id].checklist.find(c => c.id === item); if (it) it.text = t.value; p.nodes[id].updated = nowISO(); }, { co: 'ck' + item, delay: 700 });
+    return;
+  }
   if (!f || !id) return;
   if (f === 'title' || f === 'notes' || f === 'findings') {
     const v = f === 'title' ? t.value.replace(/\s*\n\s*/g, ' ') : t.value;
@@ -1688,7 +1818,19 @@ el.insp.addEventListener('input', e => {
     mutate(p => { p.nodes[id].progress = v; p.nodes[id].updated = nowISO(); }, { co: f + id, delay: 400 });
   }
 });
-el.insp.addEventListener('keydown', e => { if (e.target.id === 'f-title' && e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+el.insp.addEventListener('keydown', e => {
+  const t = e.target;
+  if (e.key !== 'Enter') return;
+  if (t.id === 'f-title') { e.preventDefault(); t.blur(); }
+  else if (t.id === 'ck-new' && state.sel) {
+    e.preventDefault();
+    const text = t.value.trim();
+    if (!text) return;
+    addItem(state.sel, text);
+    const again = $('ck-new');   // keep typing items one after another
+    if (again) again.focus({ preventScroll: true });
+  } else if (t.dataset.ck === 'text') { e.preventDefault(); const nx = $('ck-new'); if (nx) nx.focus(); }
+});
 el.insp.addEventListener('focusout', () => { lastCo = null; });
 
 el.projSel.addEventListener('change', () => openProject(el.projSel.value));
@@ -1751,8 +1893,8 @@ function outline(p) {
     if (der[id] !== 'done') tags.push(dsLabel(der[id], n).toLowerCase() + (n.status === 'active' && !isRoute(n) ? ` ${n.progress}%` : ''));
     if (isRoute(n)) { const t = tally(p, id, lay, der); if (t.total) tags.push(`${t.done}/${t.total} tasks done`); }
     else {
-      const sb = subOf(p, id, lay, der);
-      if (sb.total && n.status !== 'done') tags.push(`${sb.done}/${sb.total} of next layer done`);
+      const sb = subOf(p, id);
+      if (sb.total && n.status !== 'done') tags.push(`${sb.done}/${sb.total} checklist items ticked`);
       if (n.effort != null) tags.push('~' + fmtEff(n.effort));
     }
     const extra = n.prereqs.filter(q => q !== lay.parent[id]);
@@ -1761,6 +1903,7 @@ function outline(p) {
     lines.push(`${pad}- [${n.status === 'done' ? 'x' : ' '}] ${isRoute(n) ? 'Route: ' : ''}${n.title}${tags.length ? ` (${tags.join(', ')})` : ''}`);
     if (n.notes.trim()) lines.push(`${pad}  ${isRoute(n) ? 'Hypothesis' : 'Plan'}: ${n.notes.trim().replace(/\s*\n\s*/g, ' ')}`);
     if (n.findings.trim()) lines.push(`${pad}  ${isRoute(n) ? 'Evidence' : 'Findings'}: ${n.findings.trim().replace(/\s*\n\s*/g, ' ')}`);
+    n.checklist.forEach(c => lines.push(`${pad}  - [${c.done ? 'x' : ' '}] ${c.text}`));
     (lay.kids[id] || []).forEach(c => walk(c, depth + 1));
   };
   lay.roots.forEach(r => walk(r, 0));
@@ -1873,6 +2016,7 @@ const CUES = {
   done: [[783.99, 0], [1046.5, 0.09]],                                   // G5 then C6
   complete: [[523.25, 0], [659.25, 0.08], [783.99, 0.16], [1046.5, 0.26]], // C major arpeggio
   adopt: [[392, 0], [587.33, 0.1], [783.99, 0.2]],                       // G4 D5 G5, an open fifth
+  tick: [[1318.51, 0]],                                                  // E6, a soft tick for a checklist item
 };
 function bell(freq, at, dur, vol) {
   // A sine fundamental plus two quickly fading inharmonic partials reads as a small bell.
@@ -1902,7 +2046,8 @@ function play(cue) {
     }
     if (actx.state === 'suspended') actx.resume();
     const t0 = actx.currentTime + 0.02, notes = CUES[cue];
-    notes.forEach(([f, d], i) => bell(f, t0 + d, i === notes.length - 1 ? 1.1 : 0.55, 0.5));
+    const soft = cue === 'tick';
+    notes.forEach(([f, d], i) => bell(f, t0 + d, soft ? 0.3 : i === notes.length - 1 ? 1.1 : 0.55, soft ? 0.22 : 0.5));
   } catch (e) { /* no audio in this view */ }
 }
 const soundBtn = $('soundBtn');
@@ -1930,7 +2075,7 @@ document.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (k === 'f') { e.preventDefault(); fit(); }
   else if (k === 'n') { e.preventDefault(); addIdea(state.sel ? 'follow' : 'root', 'task'); }
-  else if (k === 'r') { e.preventDefault(); addIdea(state.sel ? 'follow' : 'root', 'route'); }
+  else if (k === 'r') { e.preventDefault(); addRoutes(); }
   else if (k === 'p' && state.sel) { e.preventDefault(); addIdea('parallel'); }
   else if ((e.key === 'Delete' || e.key === 'Backspace') && state.sel) { e.preventDefault(); deleteNode(state.sel); }
 });
