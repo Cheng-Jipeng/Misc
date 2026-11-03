@@ -510,6 +510,7 @@ let DB = null;  // artifact store, when available
 // ---------- small helpers
 const uid = pre => pre + Math.random().toString(36).slice(2, 9);
 const nowISO = () => new Date().toISOString();
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };   // local calendar date
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const trunc = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
@@ -900,6 +901,7 @@ function addIdea(kind, type) {
   const t = type || (base && (kind === 'parallel' || kind === 'alt') ? base.type : 'task');
   let newId = null;
   mutate(p => {
+    const tiersBefore = L ? L.maxDepth + 1 : 0;
     const props = { kind: base ? base.kind : 'Other', type: t, title: t === 'route' ? 'New route' : 'New idea' };
     if (kind === 'follow') props.prereqs = [base.id];
     else if (kind === 'parallel' || kind === 'alt') props.prereqs = base.prereqs.slice();
@@ -911,6 +913,9 @@ function addIdea(kind, type) {
       grp.forEach(g => { p.nodes[g].alts = uniq([...p.nodes[g].alts, n.id]); });
     }
     newId = n.id;
+    // The first idea to open a new tier stamps that tier with today's date; later ones leave it alone.
+    const d = computeLayout(p).pos[n.id].d;
+    if (d >= tiersBefore) p.tierDates = { ...(p.tierDates || {}), [d]: todayISO() };
   });
   if (newId) select(newId, { center: true, focus: true });
 }
@@ -1058,7 +1063,7 @@ function newProject() {
   const t = nowISO(), id = uid('p');
   const root = makeNode({ title: 'Research question' });
   root.seq = 0;
-  state.projects[id] = { id, name: 'Untitled tree', created: t, updated: t, order: nextOrder(), nodes: { [root.id]: root } };
+  state.projects[id] = { id, name: 'Untitled tree', created: t, updated: t, order: nextOrder(), tierDates: { 0: todayISO() }, nodes: { [root.id]: root } };
   scheduleSave(id);
   openProject(id, { fresh: true });
   select(root.id);
