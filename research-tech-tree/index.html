@@ -1498,15 +1498,25 @@ function endPointer(e) {
 }
 el.viewport.addEventListener('pointerup', endPointer);
 el.viewport.addEventListener('pointercancel', endPointer);
-let wheelT = 0;
+let wheelT = 0, lastPadAt = -1e9;
+// Browsers do not say which device sent a wheel event, so read its shape: a mouse notch is a large,
+// whole, vertical-only step (or counted in lines), while a trackpad sends small, fractional or
+// two-axis deltas. Once a trackpad is seen, its momentum tail is treated as trackpad too.
+function isMouseWheel(e) {
+  const now = performance.now();
+  const legacy = e.wheelDeltaY;   // WebKit/Blink: a trackpad reports exactly -3x deltaY here
+  const pad = e.deltaMode === 0 && (e.deltaX !== 0 || !Number.isInteger(e.deltaY) || Math.abs(e.deltaY) < 40
+    || (legacy && Math.abs(legacy) === Math.abs(e.deltaY) * 3));
+  if (pad) { lastPadAt = now; return false; }
+  return now - lastPadAt > 350;
+}
 el.viewport.addEventListener('wheel', e => {
   e.preventDefault();
   const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
-  // The wheel zooms around the cursor (pinch arrives as Ctrl+wheel with finer deltas); a sideways
-  // swipe still pans, and dragging the canvas pans in any direction.
-  const dy = e.deltaY * unit;
-  if (dy) zoomAt(e.clientX, e.clientY, Math.exp(-clamp(dy, -120, 120) * (e.ctrlKey ? 0.01 : 0.0015)));
-  if (e.deltaX && !e.ctrlKey) { view.x -= e.deltaX * unit; applyView(); }
+  // Pinch (Ctrl+wheel) zooms; a mouse wheel zooms around the cursor; a trackpad swipe pans.
+  if (e.ctrlKey || e.metaKey) zoomAt(e.clientX, e.clientY, Math.exp(-clamp(e.deltaY * unit, -60, 60) * 0.01));
+  else if (isMouseWheel(e)) zoomAt(e.clientX, e.clientY, Math.exp(-clamp(e.deltaY * unit, -120, 120) * 0.0015));
+  else { view.x -= e.deltaX * unit; view.y -= e.deltaY * unit; applyView(); }
   clearTimeout(wheelT);
   wheelT = setTimeout(rememberView, 250);
 }, { passive: false });
