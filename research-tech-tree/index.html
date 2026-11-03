@@ -221,7 +221,16 @@ button { cursor: pointer; }
   background: var(--bg); border: 1.5px solid var(--line-strong);
 }
 .tierbar { position: absolute; left: 0; right: 0; top: 0; height: 34px; z-index: 2; pointer-events: none; background: linear-gradient(var(--bg) 40%, transparent); }
-.tier { position: absolute; top: 9px; transform: translateX(-50%); white-space: nowrap; font: 13px/1 var(--font-display); letter-spacing: .16em; color: var(--muted); }
+.tier {
+  position: absolute; top: 5px; transform: translateX(-50%); pointer-events: auto; width: 138px; height: 25px; padding: 0 6px;
+  font: 500 12px/1 var(--font-mono); font-variant-numeric: tabular-nums; text-align: center; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: 6px;
+}
+.tier.unset { color: var(--muted); background: transparent; border-style: dashed; border-color: var(--line-strong); }
+.tier:hover:not(:disabled) { border-color: var(--ink); }
+.tier.compact { font-size: 10px; padding: 0 2px; }
+.tier.compact::-webkit-calendar-picker-indicator { display: none; }
+.tier:focus { outline: none; border-color: var(--active); border-style: solid; background: var(--surface); color: var(--ink); }
 
 /* ---------- frontier */
 .frontier {
@@ -586,13 +595,16 @@ function normProject(id, r) {
     created: typeof r.created === 'string' ? r.created : t,
     updated: typeof r.updated === 'string' ? r.updated : t,
     order: Number(r.order) || 0,
+    // One date per tier (column), keyed by tier index: a target or deadline you type or pick.
+    tierDates: Object.fromEntries(Object.entries(r.tierDates && typeof r.tierDates === 'object' ? r.tierDates : {})
+      .filter(([k, v]) => /^\d+$/.test(k) && typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v))),
     nodes,
   };
 }
 function toBody(p) {
   const nodes = {};
   for (const n of Object.values(p.nodes)) { const { id, ...rest } = n; nodes[id] = rest; }
-  return { name: p.name, created: p.created, updated: p.updated, order: p.order, nodes };
+  return { name: p.name, created: p.created, updated: p.updated, order: p.order, tierDates: p.tierDates || {}, nodes };
 }
 function altGroupsOf(nodes) {
   const par = {};
@@ -1074,7 +1086,7 @@ function render() {
   const p = cur();
   if (!state.loaded || !p) {
     L = null; D = {};
-    el.bands.innerHTML = ''; el.edges.innerHTML = ''; el.nodes.innerHTML = ''; el.tierbar.innerHTML = '';
+    el.bands.innerHTML = ''; el.edges.innerHTML = ''; el.nodes.innerHTML = ''; renderTierBar();
     el.frontier.hidden = true;
     showEmpty(state.loaded ? 'none' : 'loading');
     return;
@@ -1211,17 +1223,53 @@ function renderWorld(p) {
   }
   el.nodes.innerHTML = html;
 }
-function renderTierBar() {
-  if (!L) { el.tierbar.innerHTML = ''; return; }
-  const vw = el.stage.clientWidth;
-  let h = '';
-  for (let d = 0; d <= L.maxDepth; d++) {
-    const x = view.x + (PADX + d * COLW + W / 2) * view.k;
-    if (x < -80 || x > vw + 80) continue;
-    h += `<span class="tier" style="left:${x.toFixed(1)}px">Tier ${roman(d + 1)}</span>`;
-  }
-  el.tierbar.innerHTML = h;
+// Tier headers are date fields (type a date or open the picker). The inputs persist across
+// pans and zooms and are only repositioned, so typing into one is never interrupted.
+const tierInputs = [];
+function fmtTierDate(v) {
+  const d = v ? new Date(v + 'T00:00:00') : null;
+  return d && !isNaN(d) ? d.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '';
 }
+function renderTierBar() {
+  const p = cur();
+  const count = L && p ? L.maxDepth + 1 : 0;
+  while (tierInputs.length > count) tierInputs.pop().remove();
+  while (tierInputs.length < count) {
+    const d = tierInputs.length, inp = document.createElement('input');
+    inp.type = 'date';
+    inp.className = 'tier';
+    inp.id = 'tier-date-' + d;
+    inp.dataset.tier = d;
+    inp.setAttribute('aria-label', `Date for tier ${d + 1}`);
+    el.tierbar.appendChild(inp);
+    tierInputs.push(inp);
+  }
+  const vw = el.stage.clientWidth;
+  tierInputs.forEach((inp, d) => {
+    const x = view.x + (PADX + d * COLW + W / 2) * view.k;
+    inp.hidden = x < -80 || x > vw + 80;
+    inp.style.left = x.toFixed(1) + 'px';
+    const room = COLW * view.k - 10;   // keep neighbouring date fields from overlapping when zoomed out
+    inp.style.width = clamp(room, 78, 138).toFixed(0) + 'px';
+    inp.classList.toggle('compact', room < 124);
+    const v = (p.tierDates && p.tierDates[d]) || '';
+    if (document.activeElement !== inp && inp.value !== v) inp.value = v;
+    inp.classList.toggle('unset', !inp.value);
+    inp.disabled = state.readOnly;
+    inp.title = v ? `${fmtTierDate(v)} · tier ${roman(d + 1)}` : `Tier ${roman(d + 1)}: type a date or pick one`;
+  });
+}
+el.tierbar.addEventListener('change', e => {
+  const inp = e.target.closest('.tier');
+  if (!inp || state.readOnly) return;
+  const d = inp.dataset.tier, v = inp.value;
+  if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+  mutate(p => {
+    p.tierDates = { ...(p.tierDates || {}) };
+    if (v) p.tierDates[d] = v; else delete p.tierDates[d];
+  }, { co: 'tier' + d, delay: 300, insp: !!state.sel });
+});
+el.tierbar.addEventListener('focusout', () => { lastCo = null; });
 function renderFrontier() {
   const p = cur();
   if (!p) { el.frontier.hidden = true; return; }
@@ -1347,7 +1395,7 @@ function renderInspector() {
   const altOpts = state.readOnly ? [] : sortedNodes(p).filter(m => m.id !== n.id && !n.alts.includes(m.id) && !dependsOn(p, m.id, n.id) && !dependsOn(p, n.id, m.id));
   const adder = (kind, opts, label) => opts.length ? `<select class="addsel" data-add="${kind}" aria-label="${label}"><option value="">+ ${label}…</option>${opts.map(m => `<option value="${esc(m.id)}">${isRoute(m) ? 'Route: ' : ''}${esc(trunc(m.title || 'Untitled idea', 50))}</option>`).join('')}</select>` : '';
   el.insp.hidden = false;
-  el.insp.innerHTML = `<div class="i-top"><span class="pill s-${ds}">${dsLabel(ds, n)}</span><span class="i-tier">Tier ${roman(L.pos[n.id].d + 1)}</span><span class="grow"></span>`
+  el.insp.innerHTML = `<div class="i-top"><span class="pill s-${ds}">${dsLabel(ds, n)}</span><span class="i-tier">${(p.tierDates && p.tierDates[L.pos[n.id].d]) ? esc(fmtTierDate(p.tierDates[L.pos[n.id].d])) : `Tier ${roman(L.pos[n.id].d + 1)}`}</span><span class="grow"></span>`
     + `<div class="mini-seg type-seg" role="group" aria-label="Node type" title="${ROUTE_HELP}">${['task', 'route'].map(t => `<button data-type="${t}" class="${type === t ? 'on' : ''}" aria-pressed="${type === t}"${ro}>${t === 'task' ? 'Task' : 'Route'}</button>`).join('')}</div>`
     + '<button class="icon-btn" data-act="close" aria-label="Close details">&times;</button></div>'
     + `<label class="sr" for="f-title">Title</label><textarea id="f-title" class="i-title" data-f="title" rows="2" maxlength="200" placeholder="${route ? 'Name this route' : 'Name this idea'}"${ro}>${esc(n.title)}</textarea>`
