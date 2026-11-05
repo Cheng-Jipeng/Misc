@@ -172,7 +172,12 @@ button { cursor: pointer; }
 .node:hover .port, .node.sel .port { opacity: 1; }
 .port:hover { border-color: var(--active); background: var(--active-soft); }
 @media (hover: none) { .node:not(.sel) .port { display: none; } }
-.node.drop-ok { outline: 2px dashed var(--avail); outline-offset: 4px; }
+.node.drop-ok, .inode.drop-ok { outline: 2px dashed var(--avail); outline-offset: 4px; }
+.inode.drop-bad { outline: 2px dashed var(--drop); outline-offset: 4px; }
+.node.drag-src, .inode.drag-src { opacity: .35; }
+.drag-ghost { pointer-events: none; z-index: 5; opacity: .92; box-shadow: 0 16px 40px var(--shadow) !important; transform: rotate(-1.5deg); }
+.node.drag-ready, .inode.drag-ready { box-shadow: 0 0 0 4px var(--active-soft), 0 8px 24px var(--shadow); }
+.viewport.dragging { cursor: grabbing; }
 .node.drop-bad { outline: 2px dashed var(--drop); outline-offset: 4px; }
 
 .node.s-done { background: var(--done-bg); border-color: var(--accent); }
@@ -1575,7 +1580,7 @@ function renderFrontier() {
     + `<h3 class="fr-h">Researching</h3>${act.length ? act.map(item).join('') : '<p class="fr-none">Nothing in progress. Start one of the available ideas.</p>'}`
     + `<h3 class="fr-h">Available</h3>${av.length ? av.map(item).join('') : '<p class="fr-none">Nothing is unlocked right now. Finish a task or explore a route to open what comes next.</p>'}`
     + `<div class="legend">${DS_ORDER.map(s => `<span><i class="dot s-${s}"></i>${LEGEND_LABEL[s] || DS_LABEL[s]}</span>`).join('')}<span><i class="dot shape"></i>Task</span><span><i class="dot shape route"></i>Route</span></div>`
-    + '<p class="keys edit-only"><kbd>N</kbd> task · <kbd>R</kbd> competing routes · double-click a card to open its task tree · <kbd>P</kbd> parallel · <kbd>F</kbd> fit · <kbd>Del</kbd> delete · <kbd>Ctrl Z</kbd> undo. Drag the dot on a card\'s right edge onto another card to link them.</p>'
+    + '<p class="keys edit-only"><kbd>N</kbd> task · <kbd>R</kbd> competing routes · double-click a card to open its task tree · drag a card onto another to move it under that one · <kbd>P</kbd> parallel · <kbd>F</kbd> fit · <kbd>Del</kbd> delete · <kbd>Ctrl Z</kbd> undo. Drag the dot on a card\'s right edge onto another card to link them.</p>'
     + '</div>';
   const nb = el.frontier.querySelector('.fr-body');
   if (nb) nb.scrollTop = scroll;
@@ -1995,8 +2000,19 @@ el.viewport.addEventListener('pointerdown', e => {
   cancelAnimationFrame(animId);
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   try { el.viewport.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-  if (ptrs.size === 1) gesture = { type: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y, moved: false, target: e.target };
-  else if (ptrs.size === 2) {
+  if (ptrs.size === 1) {
+    gesture = { type: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y, moved: false, target: e.target };
+    // A card can be dragged onto another to move it there. A mouse drags at once; a finger has to
+    // hold still for a moment first, so that a quick swipe across cards still pans.
+    const card = state.readOnly ? null : state.inner
+      ? (!e.target.closest('[data-imedal]') && e.target.closest('.inode:not(.iroot)'))
+      : e.target.closest('#nodes .node');
+    if (card) {
+      gesture.drag = { id: state.inner ? card.dataset.iid : card.dataset.id, ready: e.pointerType !== 'touch' };
+      if (!gesture.drag.ready) gesture.holdT = setTimeout(() => { if (gesture && gesture.drag && !gesture.moved) { gesture.drag.ready = true; card.classList.add('drag-ready'); } }, 350);
+    }
+  } else if (ptrs.size === 2) {
+    if (gesture) { clearTimeout(gesture.holdT); if (gesture.type === 'drag') endDrag(null); }
     const [a, b] = [...ptrs.values()];
     gesture = { type: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, k0: view.k, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, vx: view.x, vy: view.y, moved: true };
   }
@@ -2004,9 +2020,15 @@ el.viewport.addEventListener('pointerdown', e => {
 el.viewport.addEventListener('pointermove', e => {
   if (!ptrs.has(e.pointerId) || !gesture) return;
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (gesture.type === 'drag') { moveDrag(e); return; }
   if (gesture.type === 'pan' && ptrs.size === 1) {
     const dx = e.clientX - gesture.sx, dy = e.clientY - gesture.sy;
-    if (!gesture.moved && Math.hypot(dx, dy) > 5) { gesture.moved = true; el.viewport.classList.add('panning'); }
+    if (!gesture.moved && Math.hypot(dx, dy) > 5) {
+      clearTimeout(gesture.holdT);
+      if (gesture.drag && gesture.drag.ready) { startDrag(e); return; }
+      gesture.moved = true;
+      el.viewport.classList.add('panning');
+    }
     if (gesture.moved) { view.x = gesture.vx + dx; view.y = gesture.vy + dy; applyView(); }
   } else if (gesture.type === 'pinch' && ptrs.size === 2) {
     const [a, b] = [...ptrs.values()];
@@ -2017,6 +2039,93 @@ el.viewport.addEventListener('pointermove', e => {
     applyView();
   }
 });
+// ---------- dragging a card onto another to move it there
+// On the tech tree that replaces the card's parent line (other prerequisites stay); in a task tree it
+// moves the task, with its subtasks, under the target, or to the top level when dropped on the card.
+function dragTarget(id) {   // -> { ok, label } for dropping the dragged card on card `id`
+  const d = gesture.drag, p = cur();
+  if (state.inner) {
+    const n = innerTech(), x = n && findSub(n, d.id);
+    if (!x || id === d.id) return { ok: false };
+    const pid = id === '__root' ? null : id;
+    if (x.parent === pid) return { ok: false, same: true };
+    if (pid && inSubtree(n, pid, d.id)) return { ok: false, why: 'A task cannot go under one of its own subtasks.' };
+    return { ok: true, pid };
+  }
+  if (!p.nodes[id] || id === d.id) return { ok: false };
+  if (L.parent[d.id] === id) return { ok: false, same: true };
+  if (dependsOn(p, id, d.id)) return { ok: false, why: `That would make a loop: “${trunc(p.nodes[id].title, 30)}” already depends on it.` };
+  return { ok: true };
+}
+function startDrag(e) {
+  const d = gesture.drag, layer = state.inner ? el.inodes : el.nodes;
+  const src = layer.querySelector(state.inner ? `.inode[data-iid="${CSS.escape(d.id)}"]` : `.node[data-id="${CSS.escape(d.id)}"]`);
+  if (!src) { gesture.drag = null; return; }
+  gesture.type = 'drag';
+  clearTimeout(tapCenterT);
+  const w = toWorld(e.clientX, e.clientY);
+  d.offX = w.x - parseFloat(src.style.left);
+  d.offY = w.y - parseFloat(src.style.top);
+  d.src = src;
+  d.ghost = src.cloneNode(true);
+  d.ghost.classList.add('drag-ghost');
+  d.ghost.classList.remove('sel', 'drag-ready');
+  d.ghost.removeAttribute('tabindex');
+  layer.appendChild(d.ghost);
+  src.classList.add('drag-src');
+  el.viewport.classList.add('dragging');
+  moveDrag(e);
+}
+function moveDrag(e) {
+  const d = gesture.drag;
+  if (!d || !d.ghost) return;
+  const w = toWorld(e.clientX, e.clientY);
+  d.ghost.style.left = (w.x - d.offX) + 'px';
+  d.ghost.style.top = (w.y - d.offY) + 'px';
+  const hit = document.elementFromPoint(e.clientX, e.clientY);
+  const card = hit && hit.closest ? hit.closest(state.inner ? '.inode' : '#nodes .node') : null;
+  const id = card && card !== d.ghost ? (state.inner ? card.dataset.iid : card.dataset.id) : null;
+  if (d.over && d.over !== card) d.over.classList.remove('drop-ok', 'drop-bad');
+  d.over = card && card !== d.ghost ? card : null;
+  d.verdict = id ? dragTarget(id) : null;
+  d.overId = id;
+  if (d.over) { d.over.classList.toggle('drop-ok', d.verdict.ok); d.over.classList.toggle('drop-bad', !d.verdict.ok && !d.verdict.same); }
+}
+function endDrag(e) {
+  const d = gesture && gesture.drag;
+  el.viewport.classList.remove('dragging');
+  if (!d) return;
+  if (d.ghost) d.ghost.remove();
+  if (d.src) d.src.classList.remove('drag-src');
+  if (d.over) d.over.classList.remove('drop-ok', 'drop-bad');
+  gesture.drag = null;
+  swallowClick(e ? e.clientX : -1e4, e ? e.clientY : -1e4);
+  const v = d.verdict;
+  if (!e || !v || !d.overId) return;
+  if (!v.ok) { if (v.why) toast(v.why); return; }
+  if (state.inner) {
+    const n = innerTech(), x = findSub(n, d.id), to = v.pid ? findSub(n, v.pid) : null;
+    iReparent(d.id, v.pid);
+    ifx[d.id] = 'fx-tick';
+    renderInner();
+    toast(`Moved “${trunc(x.text, 30)}” ${to ? `under “${trunc(to.text, 30)}”` : 'to the top level'}.`, { action: 'Undo', onAction: undo });
+  } else moveUnder(d.id, d.overId);
+}
+function moveUnder(id, targetId) {
+  const p = cur(), n = p.nodes[id], t = p.nodes[targetId], old = L.parent[id];
+  mutate(p => {
+    const tiersBefore = L ? L.maxDepth + 1 : 0;
+    const m = p.nodes[id];
+    m.prereqs = uniq([...m.prereqs.filter(q => q !== old), targetId]);
+    if (m.alts.includes(targetId)) removeFromGroup(p, id);
+    m.updated = nowISO();
+    stampTier(p, id, tiersBefore);
+  }, { insp: !!state.sel });
+  fx[id] = 'fx-tick';
+  render();
+  toast(`Moved “${trunc(n.title, 30)}” under “${trunc(t.title, 30)}”${old && p.nodes[old] ? `, out of “${trunc(p.nodes[old].title, 24)}”` : ''}.`, { action: 'Undo', onAction: undo });
+}
+
 // A tap selects on pointerup and may open the inspector under the finger or cursor; the
 // browser's follow-up click (same spot, moments later) must not land on whatever is there now.
 let lastTap = null;
@@ -2031,6 +2140,13 @@ let lastTapAt = { id: null, t: 0 }, tapCenterT = 0;   // for double-click and do
 function endPointer(e) {
   if (!ptrs.has(e.pointerId)) return;
   ptrs.delete(e.pointerId);
+  if (gesture) clearTimeout(gesture.holdT);
+  el.viewport.querySelectorAll('.drag-ready').forEach(c => c.classList.remove('drag-ready'));
+  if (gesture && gesture.type === 'drag') {
+    endDrag(e.type === 'pointerup' ? e : null);
+    if (ptrs.size === 0) gesture = null;
+    return;
+  }
   if (gesture && gesture.type === 'pan' && !gesture.moved && e.type === 'pointerup') {
     swallowClick(e.clientX, e.clientY);
     const tg = gesture.target && gesture.target.closest ? gesture.target : null;
