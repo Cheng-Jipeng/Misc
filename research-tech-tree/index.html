@@ -239,10 +239,39 @@ button { cursor: pointer; }
 .tier:focus { outline: none; border-color: var(--active); border-style: solid; background: var(--surface); color: var(--ink); }
 
 /* ---------- frontier */
-.frontier {
+.side {
   position: absolute; z-index: 3; top: 40px; left: max(12px, env(safe-area-inset-left, 0px)); width: 268px; max-height: calc(100% - 52px);
-  display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 22px var(--shadow);
+  display: flex; flex-direction: column; gap: 10px; pointer-events: none;
 }
+.app.inside .side { top: 66px; max-height: calc(100% - 78px); }
+.panel {
+  pointer-events: auto; min-height: 0; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 22px var(--shadow);
+}
+.frontier { flex: 0 1 auto; }
+.todo { flex: 0 1 auto; }
+.fr-count.td-count { background: var(--drop-soft); color: var(--drop); }
+.td-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.td-row { display: flex; align-items: stretch; gap: 2px; border-radius: 7px; background: var(--surface-2); border: 1px solid transparent; transition: opacity .3s ease; }
+.td-row:hover { border-color: var(--line-strong); }
+.td-row.td-done { opacity: .4; }
+.td-row.td-done .td-t { text-decoration: line-through; }
+.td-check { flex: none; width: 34px; display: grid; place-items: center; padding: 0; border: 0; background: none; border-radius: 7px 0 0 7px; }
+.td-check svg { width: 20px; height: 20px; }
+.td-check:hover .i-hint { opacity: .7; }
+.td-mark { flex: none; width: 34px; display: grid; place-items: center; }
+.td-main { flex: 1; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 2px 8px; padding: 7px 8px 7px 0; border: 0; background: none; text-align: left; }
+.td-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.td-sub { grid-column: 2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--muted); }
+.td-sub .lk { color: var(--muted); font-style: italic; }
+.prio { display: inline-block; flex: none; padding: 2px 5px; border-radius: 4px; font: 600 10px/1.2 var(--font-mono); letter-spacing: .02em; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+.prio.p1 { background: var(--drop); color: var(--surface); border-color: var(--drop); }
+.prio.p2 { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.prio.p3 { background: var(--active-soft); color: var(--active); border-color: var(--active-soft); }
+.prio-seg button { min-width: 34px; font-family: var(--font-mono); }
+@media (hover: none) { .todo .keys { display: none; } }
+.prio-seg button[data-prio="1"].on { background: var(--drop); }
+.prio-seg button[data-prio="2"].on { background: var(--accent); }
 .fr-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; background: none; border: 0; text-align: left; border-radius: 10px; }
 .fr-name { font: 15px/1 var(--font-display); letter-spacing: .08em; }
 .fr-count { font: 600 11px/1 var(--font-mono); padding: 3px 6px; border-radius: 999px; background: var(--avail-soft); color: var(--avail); }
@@ -446,7 +475,7 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
   .meta-r { order: 2; margin-left: 0; }
   .save:not(.err) .stxt { display: none; }
   .tools { order: 3; flex-basis: 100%; }
-  .frontier { width: auto; right: max(12px, env(safe-area-inset-right, 0px)); max-height: 55%; }
+  .side { width: auto; right: max(12px, env(safe-area-inset-right, 0px)); max-height: 55%; }
   .inspector {
     left: 0; right: 0; bottom: 0; top: auto; width: auto; max-height: 64%; border-radius: 14px 14px 0 0; border-bottom: 0;
     padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -507,7 +536,10 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
       <span class="crumb-title" id="crumbTitle"></span>
       <span class="crumb-prog num" id="crumbProg"></span>
     </nav>
-    <aside class="frontier" id="frontier" aria-label="Frontier" hidden></aside>
+    <div class="side" id="side" hidden>
+      <aside class="frontier panel" id="frontier" aria-label="Frontier" hidden></aside>
+      <aside class="todo panel" id="todo" aria-label="Priorities"></aside>
+    </div>
     <aside class="inspector" id="insp" aria-label="Idea details" hidden></aside>
     <div class="empty" id="empty" hidden></div>
   </main>
@@ -577,7 +609,7 @@ const reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion
 const $ = id => document.getElementById(id);
 const el = {
   app: $('app'), stage: $('stage'), viewport: $('viewport'), world: $('world'), bands: $('bands'), edges: $('edges'), nodes: $('nodes'),
-  tierbar: $('tierbar'), frontier: $('frontier'), insp: $('insp'), empty: $('empty'), projSel: $('projSel'), projMenuBtn: $('projMenuBtn'),
+  tierbar: $('tierbar'), side: $('side'), todo: $('todo'), frontier: $('frontier'), insp: $('insp'), empty: $('empty'), projSel: $('projSel'), projMenuBtn: $('projMenuBtn'),
   projPop: $('projPop'), addBtn: $('addBtn'), undoBtn: $('undoBtn'), zIn: $('zIn'), zOut: $('zOut'), zFit: $('zFit'), dataBtn: $('dataBtn'),
   save: $('saveState'), toast: $('toast'), modal: $('dataModal'),
   iworld: $('iworld'), iedges: $('iedges'), inodes: $('inodes'), vignette: $('vignette'),
@@ -620,10 +652,14 @@ function savePrefs() {
   clearTimeout(prefT);
   prefT = setTimeout(() => { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch (e) { /* storage off */ } }, 300);
 }
-const frontierOpen = () => (typeof prefs.frontierOpen === 'boolean' ? prefs.frontierOpen : window.innerWidth > 720);
+const frontierOpen = () => (typeof prefs.frontierOpen === 'boolean' ? prefs.frontierOpen : false);
+const todoOpen = () => (typeof prefs.todoOpen === 'boolean' ? prefs.todoOpen : window.innerWidth > 720);
 function rememberView() { if (state.pid && !state.inner) { prefs.views[state.pid] = { x: Math.round(view.x), y: Math.round(view.y), k: +view.k.toFixed(3) }; savePrefs(); } }
 
 // ---------- data model
+// Priority 1 (most urgent) to 5, or null for none; any card or task can carry one.
+const normPrio = v => { const n = Math.round(Number(v)); return v != null && v !== '' && n >= 1 && n <= 5 ? n : null; };
+const prioBadge = v => (v ? `<span class="prio p${v}" title="Priority ${v}">P${v}</span>` : '');
 function normNode(id, r, i) {
   r = r && typeof r === 'object' ? r : {};
   const t = nowISO();
@@ -639,6 +675,7 @@ function normNode(id, r, i) {
     autoDone: r.autoDone === true && r.status === 'done',   // completed by ticking its checklist, not by hand
     effort: Number.isFinite(eff) && eff >= 0 ? eff : null,
     progress: clamp(Math.round(Number(r.progress) || 0), 0, 100),
+    priority: normPrio(r.priority),
     prereqs: Array.isArray(r.prereqs) ? r.prereqs.filter(x => typeof x === 'string') : [],
     alts: Array.isArray(r.alts) ? r.alts.filter(x => typeof x === 'string') : [],
     subtasks: normSubtasks(r.subtasks || r.checklist),   // the card's task tree (older trees kept a flat checklist)
@@ -658,6 +695,7 @@ function normSubtasks(raw) {
       parent: typeof c.parent === 'string' ? c.parent : null,
       seq: Number.isFinite(Number(c.seq)) && c.seq !== null && c.seq !== '' ? Number(c.seq) : i,
       note: typeof c.note === 'string' ? c.note : '',
+      priority: normPrio(c.priority),
       autoDone: c.autoDone === true && status === 'done',
     };
   });
@@ -1357,6 +1395,7 @@ function render() {
     L = null; D = {};
     el.bands.innerHTML = ''; el.edges.innerHTML = ''; el.nodes.innerHTML = ''; renderTierBar();
     el.frontier.hidden = true;
+    el.side.hidden = true;
     showEmpty(state.loaded ? 'none' : 'loading');
     return;
   }
@@ -1370,6 +1409,8 @@ function render() {
   renderFrontier();
   renderInner();
   if (state.inner) el.frontier.hidden = true;
+  el.side.hidden = false;
+  renderTodo(p);
   el.tierbar.hidden = !!state.inner;
 }
 let projKey = '';
@@ -1471,7 +1512,7 @@ function renderWorld(p) {
   for (const n of nodes) {
     const ds = D[n.id], pos = L.pos[n.id], unl = (L.children[n.id] || []).length, route = isRoute(n);
     const t = route ? tally(p, n.id) : null;
-    const meta = [];
+    const meta = n.priority && n.status !== 'done' && n.status !== 'dropped' ? [prioBadge(n.priority)] : [];
     if (route) {
       meta.push('<span class="kind k-route">Route</span>');
       if (t.total) meta.push(`<span title="Tasks under this route that are done">${t.done}/${t.total}</span>`);
@@ -1548,6 +1589,76 @@ el.tierbar.addEventListener('change', e => {
   }, { co: 'tier' + d, delay: 300, insp: !!state.sel });
 });
 el.tierbar.addEventListener('focusout', () => { lastCo = null; });
+// ---------- the priority list: every open card or task with a priority, most urgent first
+function todoItems(p) {
+  const items = [];
+  for (const n of sortedNodes(p)) {
+    if (n.priority && n.status !== 'done' && n.status !== 'dropped' && D[n.id] !== 'superseded')
+      items.push({ key: 'n:' + n.id, prio: n.priority, depth: L.pos[n.id].d, seq: n.seq, title: n.title, route: isRoute(n), node: n, ds: D[n.id] });
+    if (n.status === 'dropped') continue;
+    for (const x of n.subtasks) if (x.priority && x.status !== 'done' && x.status !== 'dropped')
+      items.push({ key: 's:' + n.id + ':' + x.id, prio: x.priority, depth: L.pos[n.id].d + 0.5, seq: n.seq + x.seq / 1e4, title: x.text, tech: n, sub: x });
+  }
+  return items.sort((a, b) => a.prio - b.prio || a.depth - b.depth || a.seq - b.seq);
+}
+function renderTodo(p) {
+  const open = todoOpen(), items = todoItems(p);
+  const body = el.todo.querySelector('.fr-body'), scroll = body ? body.scrollTop : 0;
+  const ring = '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="15" class="i-ring" fill="none"/><path d="M13 20.5l4.5 4.5 9.5-10" class="i-hint" fill="none"/></svg>';
+  const row = it => {
+    const sub = it.sub
+      ? `in “${esc(trunc(it.tech.title, 40))}”`
+      : it.route ? `Route · ${dsLabel(it.ds, it.node).toLowerCase()}` : it.ds === 'locked' ? '<span class="lk">locked: waiting on its prerequisites</span>' : it.ds === 'blocked' ? '<span class="lk">cut off</span>' : dsLabel(it.ds, it.node);
+    const check = it.route
+      ? `<span class="td-mark" title="Routes are adopted from their panel"><i class="dot route s-${it.ds}"></i></span>`
+      : `<button class="td-check" data-tdtick="${esc(it.key)}" title="Mark done" aria-label="Mark “${esc(it.title)}” done"${state.readOnly ? ' disabled' : ''}>${ring}</button>`;
+    return `<li class="td-row" data-tdrow="${esc(it.key)}">${check}<button class="td-main" data-tdgo="${esc(it.key)}" title="${esc(it.title)}">${prioBadge(it.prio)}<span class="td-t">${esc(it.title || 'Untitled')}</span><span class="td-sub">${sub}</span></button></li>`;
+  };
+  el.todo.innerHTML = `<button class="fr-head" id="tdToggle" aria-expanded="${open}"><span class="fr-name">Priorities</span><span class="fr-count td-count num" title="Open items with a priority">${items.length}</span><svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none"/></svg></button>`
+    + `<div class="fr-body"${open ? '' : ' hidden'}>`
+    + (items.length ? `<ol class="td-list">${items.map(row).join('')}</ol>` : '<p class="fr-none">No priorities yet. Select a card or a task inside one and press 1 to 5, or set Priority in its panel.</p>')
+    + '<p class="keys edit-only"><kbd>1</kbd>–<kbd>5</kbd> set the selected item\'s priority, <kbd>0</kbd> clears it. Ticking an item marks it done.</p>'
+    + '</div>';
+  const nb = el.todo.querySelector('.fr-body');
+  if (nb) nb.scrollTop = scroll;
+}
+function parseTodoKey(key) {
+  const [kind, a, b] = key.split(':');
+  return kind === 'n' ? { id: a } : { id: a, sid: b };
+}
+function todoGo(key) {
+  const { id, sid } = parseTodoKey(key), p = cur();
+  if (!p || !p.nodes[id]) return;
+  if (window.innerWidth <= 720) { prefs.todoOpen = false; savePrefs(); }
+  if (!sid) { select(id, { center: true, force: true }); return; }
+  if (state.inner && state.inner.id === id) { selectInner(sid, { center: true }); return; }
+  if (state.inner) closeInner(true);
+  openInner(id, { selectSub: sid });
+}
+function todoTick(key) {
+  const { id, sid } = parseTodoKey(key), p = cur();
+  if (!p || !p.nodes[id] || state.readOnly) return;
+  const go = () => {
+    if (!sid) { setStatus(id, 'done'); return; }
+    subEdit(id, t => { const x = findSub(t, sid); if (!x) return null; x.status = 'done'; x.autoDone = false; return settleUp(t, x.parent); }, { ticked: sid });
+  };
+  const rowEl = el.todo.querySelector(`[data-tdrow="${CSS.escape(key)}"]`);
+  if (rowEl && !reduceMotion) { rowEl.classList.add('td-done'); setTimeout(go, 280); } else go();
+}
+function setPriority(id, v) {
+  const p = cur();
+  if (!p || !p.nodes[id] || state.readOnly || p.nodes[id].priority === v) return;
+  mutate(p => { p.nodes[id].priority = v; p.nodes[id].updated = nowISO(); }, { insp: true });
+}
+function setSubPriority(techId, sid, v) {
+  const p = cur(), x = p && p.nodes[techId] && findSub(p.nodes[techId], sid);
+  if (!x || state.readOnly || x.priority === v) return;
+  mutate(p => { findSub(p.nodes[techId], sid).priority = v; p.nodes[techId].updated = nowISO(); }, { insp: true });
+}
+const prioControl = (v, ro, attr) => `<div class="field"><span class="lbl">Priority</span><div class="mini-seg prio-seg" role="group" aria-label="Priority">`
+  + [null, 1, 2, 3, 4, 5].map(k => `<button ${attr}="${k || ''}" class="${(v || null) === k ? 'on' : ''}" aria-pressed="${(v || null) === k}"${ro}${k ? ` title="Priority ${k}${k === 1 ? ', most urgent' : ''} (key ${k})"` : ' title="No priority (key 0)"'}>${k ? 'P' + k : '–'}</button>`).join('')
+  + '</div></div>';
+
 function renderFrontier() {
   const p = cur();
   if (!p) { el.frontier.hidden = true; return; }
@@ -1696,6 +1807,7 @@ function renderInspector() {
     + (!route && n.status === 'active' && !sub.total ? `<div class="field"><label class="lbl" for="f-prog">Progress <span class="num" id="progVal">${n.progress}%</span></label><input id="f-prog" type="range" min="0" max="100" step="5" value="${n.progress}" data-f="progress"${ro}></div>` : '')
     + (route ? routeBox(p, n) : '')
     + innerBox(p, n)
+    + prioControl(n.priority, ro, 'data-prio')
     + `<div class="row2"><div class="field"><label class="lbl" for="f-kind">Kind</label><select id="f-kind" data-f="kind"${ro}>${KINDS.map(k => `<option${k === n.kind ? ' selected' : ''}>${k}</option>`).join('')}</select></div>`
     + (route ? '' : `<div class="field"><label class="lbl" for="f-eff">Effort, days</label><input id="f-eff" class="num" type="number" min="0" step="0.5" inputmode="decimal" data-f="effort" placeholder="Not estimated" value="${n.effort == null ? '' : n.effort}"${ro}></div>`)
     + '</div>'
@@ -1733,6 +1845,7 @@ function renderInnerInspector() {
     + `<p class="why">${why}</p>`
     + `<section class="field"><h4 class="lbl">Subtasks${pr.total ? ` <span class="num">${pr.done}/${pr.total}</span>` : ''}</h4>${chips ? `<div class="chips">${chips}</div>` : '<p class="none">None yet. Break this task down further if it helps.</p>'}`
     + (state.readOnly ? '' : '<input class="inp ck-new" id="if-new" maxlength="200" placeholder="Add a subtask and press Enter" aria-label="New subtask">') + '</section>'
+    + prioControl(x.priority, ro, 'data-iprio')
     + `<div class="field"><label class="lbl" for="if-note">Notes</label><textarea id="if-note" data-if="note" rows="3" placeholder="Anything worth remembering about this task"${ro}>${esc(x.note)}</textarea></div>`
     + `<div class="field"><label class="lbl" for="if-parent">Part of</label><select id="if-parent" data-iparent="1"${ro}><option value=""${x.parent ? '' : ' selected'}>The card itself: “${esc(trunc(n.title, 40))}”</option>${parents.map(y => `<option value="${esc(y.id)}"${x.parent === y.id ? ' selected' : ''}>${esc(trunc(y.text || 'Untitled task', 50))}</option>`).join('')}</select></div>`
     + '<div class="add-row edit-only"><span class="lbl">Add</span><button class="btn" data-ia="child" title="A part of this task (N)">+ Subtask</button><button class="btn" data-ia="sibling" title="Another task at this level (P)">+ Sibling</button></div>'
@@ -1809,7 +1922,7 @@ function renderInner() {
     const pr = subProgress(n, x.id);
     html += `<div class="inode s-${x.status}${state.isel === x.id ? ' sel' : ''}${ifxNow[x.id] ? ' ' + ifxNow[x.id] : ''}" data-iid="${esc(x.id)}" style="left:${q.x}px;top:${q.y}px" tabindex="0" role="button" title="${esc(x.text)}" aria-label="${esc(x.text)}: ${ISTATUS_LABEL[x.status]}">`
       + `<button class="imedal" data-imedal="${esc(x.id)}" title="${x.status === 'done' ? 'Mark as not done' : 'Mark as done'}" aria-label="${x.status === 'done' ? 'Mark as not done' : 'Mark as done'}"${state.readOnly ? ' disabled' : ''}>${imedal(x, pr)}</button>`
-      + `<div class="nbody"><div class="ntitle">${esc(x.text || 'Untitled task')}</div><div class="nmeta">${pr.total ? `<span>${pr.done}/${pr.total} subtasks</span>` : ''}${x.note ? '<span title="Has notes">notes</span>' : ''}</div></div></div>`;
+      + `<div class="nbody"><div class="ntitle">${esc(x.text || 'Untitled task')}</div><div class="nmeta">${x.status !== 'done' && x.status !== 'dropped' ? prioBadge(x.priority) : ''}${pr.total ? `<span>${pr.done}/${pr.total} subtasks</span>` : ''}${x.note ? '<span title="Has notes">notes</span>' : ''}</div></div></div>`;
   }
   el.inodes.innerHTML = html;
   el.crumbTitle.textContent = n.title || 'Untitled idea';
@@ -1932,10 +2045,10 @@ function applyView() {
 function area() {
   const w = el.stage.clientWidth, h = el.stage.clientHeight, wide = w > 720;
   let l = 16, r = 16, t = 40, b = 16;
-  if (wide && !el.frontier.hidden && frontierOpen()) l = el.frontier.offsetWidth + 28;
+  if (wide && !el.side.hidden) l = el.side.offsetWidth + 28;
   if (!el.insp.hidden) { if (wide) r = el.insp.offsetWidth + 28; else b = el.insp.offsetHeight + 12; }
-  if (!wide && !el.frontier.hidden) t = el.frontier.offsetHeight + 52;
   if (state.inner && !el.crumb.hidden) t = el.crumb.offsetTop + el.crumb.offsetHeight + 20;
+  if (!wide && !el.side.hidden) t = el.side.offsetTop + el.side.offsetHeight + 12;
   return { l, r, t, b, w, h, aw: Math.max(80, w - l - r), ah: Math.max(80, h - t - b) };
 }
 let animId = 0;
@@ -2297,6 +2410,13 @@ el.inodes.addEventListener('click', e => {   // keyboard activation of a card's 
   if (med && e.detail === 0 && !med.disabled) iToggle(med.dataset.imedal);
 });
 el.crumbBack.addEventListener('click', () => closeInner());
+el.todo.addEventListener('click', e => {
+  if (e.target.closest('#tdToggle')) { prefs.todoOpen = !todoOpen(); savePrefs(); renderTodo(cur()); return; }
+  const tick = e.target.closest('[data-tdtick]');
+  if (tick) { todoTick(tick.dataset.tdtick); return; }
+  const go = e.target.closest('[data-tdgo]');
+  if (go) todoGo(go.dataset.tdgo);
+});
 el.frontier.addEventListener('click', e => {
   if (e.target.closest('#frToggle')) { prefs.frontierOpen = !frontierOpen(); savePrefs(); renderFrontier(); return; }
   const g = e.target.closest('[data-goto]');
@@ -2309,6 +2429,7 @@ el.insp.addEventListener('click', e => {
   const id = state.sel;
   if (el.insp.dataset.mode === 'inner') { innerInspClick(b); return; }
   if (!b || !id) return;
+  if (b.dataset.prio !== undefined) { setPriority(id, normPrio(b.dataset.prio)); return; }
   if (b.dataset.status) { setStatus(id, b.dataset.status); return; }
   if (b.dataset.type) { setType(id, b.dataset.type); return; }
   const tid = b.dataset.id;
@@ -2393,6 +2514,7 @@ el.insp.addEventListener('keydown', e => {
 function innerInspClick(b) {
   const sid = state.isel;
   if (!b || !sid) return;
+  if (b.dataset.iprio !== undefined) { setSubPriority(state.inner.id, sid, normPrio(b.dataset.iprio)); return; }
   if (b.dataset.istatus) { iSetStatus(sid, b.dataset.istatus); return; }
   const n = innerTech(), x = n && findSub(n, sid);
   switch (b.dataset.ia) {
@@ -2469,6 +2591,7 @@ function outline(p) {
       const sb = subOf(p, id);
       if (sb.total && n.status !== 'done') tags.push(`${sb.done}/${sb.total} tasks inside done`);
       if (n.effort != null) tags.push('~' + fmtEff(n.effort));
+      if (n.priority) tags.push('P' + n.priority);
     }
     const extra = n.prereqs.filter(q => q !== lay.parent[id]);
     if (extra.length) tags.push('also needs: ' + extra.map(q => N[q].title).join('; '));
@@ -2653,12 +2776,15 @@ document.addEventListener('keydown', e => {
   if (state.inner) {
     const n = innerTech(), x = n && state.isel && state.isel !== '__root' ? findSub(n, state.isel) : null;
     if (k === 'f') { e.preventDefault(); fit(); }
+    else if (/^[0-5]$/.test(k) && x) { e.preventDefault(); setSubPriority(n.id, x.id, normPrio(k)); }
+    else if (/^[0-5]$/.test(k) && state.isel === '__root') { e.preventDefault(); setPriority(n.id, normPrio(k)); }
     else if (k === 'n') { e.preventDefault(); iAdd(x ? x.id : null); }
     else if (k === 'p' && x) { e.preventDefault(); iAdd(x.parent); }
     else if ((e.key === 'Delete' || e.key === 'Backspace') && x) { e.preventDefault(); iDelete(x.id); }
     return;
   }
   if (k === 'f') { e.preventDefault(); fit(); }
+  else if (/^[0-5]$/.test(k) && state.sel) { e.preventDefault(); setPriority(state.sel, normPrio(k)); }
   else if (k === 'n') { e.preventDefault(); addIdea(state.sel ? 'follow' : 'root', 'task'); }
   else if (k === 'r') { e.preventDefault(); addRoutes(); }
   else if (k === 'p' && state.sel) { e.preventDefault(); addIdea('parallel'); }
