@@ -252,7 +252,7 @@ button { cursor: pointer; }
 .todo { flex: 0 1 auto; }
 .fr-count.td-count { background: var(--drop-soft); color: var(--drop); }
 .td-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.td-row { display: flex; align-items: stretch; gap: 2px; border-radius: 7px; background: var(--surface-2); border: 1px solid transparent; transition: opacity .3s ease; }
+.td-row { display: flex; align-items: stretch; gap: 2px; user-select: none; -webkit-user-select: none; border-radius: 7px; background: var(--surface-2); border: 1px solid transparent; transition: opacity .3s ease; }
 .td-row:hover { border-color: var(--line-strong); }
 .td-row.td-done { opacity: .4; }
 .td-row.td-done .td-t { text-decoration: line-through; }
@@ -260,9 +260,18 @@ button { cursor: pointer; }
 .td-check svg { width: 20px; height: 20px; }
 .td-check:hover .i-hint { opacity: .7; }
 .td-mark { flex: none; width: 34px; display: grid; place-items: center; }
-.td-main { flex: 1; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 2px 8px; padding: 7px 8px 7px 0; border: 0; background: none; text-align: left; }
-.td-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.td-sub { grid-column: 2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--muted); }
+.td-main { flex: 1; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 2px 8px; padding: 7px 2px 7px 0; border: 0; background: none; text-align: left; }
+.td-main .prio { margin-top: 1px; }
+.td-t { min-width: 0; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+.td-sub { grid-column: 2; min-width: 0; font-size: 11.5px; line-height: 1.35; color: var(--muted); overflow-wrap: anywhere; }
+.td-grip { flex: none; width: 22px; display: grid; place-items: center; padding: 0; border: 0; background: none; color: var(--line-strong); cursor: grab; touch-action: none; opacity: 0; border-radius: 0 7px 7px 0; }
+.td-grip svg { width: 10px; height: 16px; fill: currentColor; }
+.td-row:hover .td-grip, .td-grip:focus-visible { opacity: 1; }
+@media (hover: none) { .td-grip { opacity: 1; } }
+.td-row { position: relative; }
+.td-list.sorting .td-row { transition: transform .15s ease; }
+.td-list.sorting .td-row.td-drag { transition: none; z-index: 2; cursor: grabbing; background: var(--surface); border-color: var(--line-strong); box-shadow: 0 10px 26px var(--shadow); }
+.td-list.sorting { cursor: grabbing; user-select: none; -webkit-user-select: none; }
 .td-sub .lk { color: var(--muted); font-style: italic; }
 .prio { display: inline-block; flex: none; padding: 2px 5px; border-radius: 4px; font: 600 10px/1.2 var(--font-mono); letter-spacing: .02em; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
 .prio.p1 { background: var(--drop); color: var(--surface); border-color: var(--drop); }
@@ -676,6 +685,7 @@ function normNode(id, r, i) {
     effort: Number.isFinite(eff) && eff >= 0 ? eff : null,
     progress: clamp(Math.round(Number(r.progress) || 0), 0, 100),
     priority: normPrio(r.priority),
+    prank: Number.isFinite(r.prank) ? r.prank : null,   // hand-set place among items of the same priority
     prereqs: Array.isArray(r.prereqs) ? r.prereqs.filter(x => typeof x === 'string') : [],
     alts: Array.isArray(r.alts) ? r.alts.filter(x => typeof x === 'string') : [],
     subtasks: normSubtasks(r.subtasks || r.checklist),   // the card's task tree (older trees kept a flat checklist)
@@ -696,6 +706,7 @@ function normSubtasks(raw) {
       seq: Number.isFinite(Number(c.seq)) && c.seq !== null && c.seq !== '' ? Number(c.seq) : i,
       note: typeof c.note === 'string' ? c.note : '',
       priority: normPrio(c.priority),
+      prank: Number.isFinite(c.prank) ? c.prank : null,
       autoDone: c.autoDone === true && status === 'done',
     };
   });
@@ -1594,12 +1605,14 @@ function todoItems(p) {
   const items = [];
   for (const n of sortedNodes(p)) {
     if (n.priority && n.status !== 'done' && n.status !== 'dropped' && D[n.id] !== 'superseded')
-      items.push({ key: 'n:' + n.id, prio: n.priority, depth: L.pos[n.id].d, seq: n.seq, title: n.title, route: isRoute(n), node: n, ds: D[n.id] });
+      items.push({ key: 'n:' + n.id, prio: n.priority, rank: n.prank, depth: L.pos[n.id].d, seq: n.seq, title: n.title, route: isRoute(n), node: n, ds: D[n.id] });
     if (n.status === 'dropped') continue;
     for (const x of n.subtasks) if (x.priority && x.status !== 'done' && x.status !== 'dropped')
-      items.push({ key: 's:' + n.id + ':' + x.id, prio: x.priority, depth: L.pos[n.id].d + 0.5, seq: n.seq + x.seq / 1e4, title: x.text, tech: n, sub: x });
+      items.push({ key: 's:' + n.id + ':' + x.id, prio: x.priority, rank: x.prank, depth: L.pos[n.id].d + 0.5, seq: n.seq + x.seq / 1e4, title: x.text, tech: n, sub: x });
   }
-  return items.sort((a, b) => a.prio - b.prio || a.depth - b.depth || a.seq - b.seq);
+  // Within a priority level, items placed by hand come first in their order, the rest follow tree order.
+  const r = v => (v == null ? Infinity : v);
+  return items.sort((a, b) => a.prio - b.prio || (r(a.rank) - r(b.rank)) || a.depth - b.depth || a.seq - b.seq);
 }
 function renderTodo(p) {
   const open = todoOpen(), items = todoItems(p);
@@ -1612,12 +1625,12 @@ function renderTodo(p) {
     const check = it.route
       ? `<span class="td-mark" title="Routes are adopted from their panel"><i class="dot route s-${it.ds}"></i></span>`
       : `<button class="td-check" data-tdtick="${esc(it.key)}" title="Mark done" aria-label="Mark “${esc(it.title)}” done"${state.readOnly ? ' disabled' : ''}>${ring}</button>`;
-    return `<li class="td-row" data-tdrow="${esc(it.key)}">${check}<button class="td-main" data-tdgo="${esc(it.key)}" title="${esc(it.title)}">${prioBadge(it.prio)}<span class="td-t">${esc(it.title || 'Untitled')}</span><span class="td-sub">${sub}</span></button></li>`;
+    return `<li class="td-row" data-tdrow="${esc(it.key)}">${check}<button class="td-main" data-tdgo="${esc(it.key)}" title="${esc(it.title)}">${prioBadge(it.prio)}<span class="td-t">${esc(it.title || 'Untitled')}</span><span class="td-sub">${sub}</span></button>${state.readOnly ? '' : `<button class="td-grip" data-tdgrip="${esc(it.key)}" title="Drag to reorder" aria-label="Reorder “${esc(it.title)}”: drag, or use the arrow keys"><svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg></button>`}</li>`;
   };
   el.todo.innerHTML = `<button class="fr-head" id="tdToggle" aria-expanded="${open}"><span class="fr-name">Priorities</span><span class="fr-count td-count num" title="Open items with a priority">${items.length}</span><svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none"/></svg></button>`
     + `<div class="fr-body"${open ? '' : ' hidden'}>`
     + (items.length ? `<ol class="td-list">${items.map(row).join('')}</ol>` : '<p class="fr-none">No priorities yet. Select a card or a task inside one and press 1 to 5, or set Priority in its panel.</p>')
-    + '<p class="keys edit-only"><kbd>1</kbd>–<kbd>5</kbd> set the selected item\'s priority, <kbd>0</kbd> clears it. Ticking an item marks it done.</p>'
+    + '<p class="keys edit-only"><kbd>1</kbd>–<kbd>5</kbd> set the selected item\'s priority, <kbd>0</kbd> clears it. Ticking an item marks it done. Drag rows to reorder.</p>'
     + '</div>';
   const nb = el.todo.querySelector('.fr-body');
   if (nb) nb.scrollTop = scroll;
@@ -1645,15 +1658,90 @@ function todoTick(key) {
   const rowEl = el.todo.querySelector(`[data-tdrow="${CSS.escape(key)}"]`);
   if (rowEl && !reduceMotion) { rowEl.classList.add('td-done'); setTimeout(go, 280); } else go();
 }
+// Put an item at a new place in the list. It takes the priority of the item now above it (or below
+// it, at the top), and its whole priority level is renumbered in the new order.
+function reorderTodo(key, to) {
+  const p = cur();
+  if (!p || state.readOnly) return;
+  const items = todoItems(p), from = items.findIndex(it => it.key === key);
+  if (from < 0) return;
+  const [it] = items.splice(from, 1);
+  to = clamp(to, 0, items.length);
+  items.splice(to, 0, it);
+  const nb = items[to - 1] || items[to + 1];
+  const prio = nb ? nb.prio : it.prio;
+  if (to === from && prio === it.prio) return;
+  const grab = (p, k) => { const { id, sid } = parseTodoKey(k); return sid ? findSub(p.nodes[id], sid) : p.nodes[id]; };
+  mutate(p => {
+    grab(p, key).priority = prio;
+    items.filter(x => x.key === key || x.prio === prio).forEach((x, i) => { const o = grab(p, x.key); if (o) o.prank = i; });
+    const { id } = parseTodoKey(key);
+    p.nodes[id].updated = nowISO();
+  }, { insp: !!state.sel || !!state.isel });
+  if (prio !== it.prio) toast(`“${trunc(it.title, 36)}” is now P${prio}.`, { action: 'Undo', onAction: undo });
+}
+let tdDrag = null, tdSuppressClick = false;
+el.todo.addEventListener('pointerdown', e => {
+  if (state.readOnly || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  const row = e.target.closest('.td-row'), grip = e.target.closest('[data-tdgrip]');
+  if (!row || e.target.closest('[data-tdtick]')) return;
+  if (e.pointerType !== 'mouse' && !grip) return;   // on touch, rows scroll; the grip drags
+  const list = row.parentElement, rows = [...list.children];
+  tdDrag = { row, list, rows, key: row.dataset.tdrow, from: rows.indexOf(row), to: rows.indexOf(row), y0: e.clientY, id: e.pointerId, on: false,
+    mids: rows.map(r => { const b = r.getBoundingClientRect(); return b.top + b.height / 2; }), h: row.getBoundingClientRect().height + 4 };
+  if (grip) { e.preventDefault(); try { grip.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } }
+});
+window.addEventListener('pointermove', e => {
+  const d = tdDrag;
+  if (!d || e.pointerId !== d.id) return;
+  const dy = e.clientY - d.y0;
+  if (!d.on) { if (Math.abs(dy) < 5) return; d.on = true; d.list.classList.add('sorting'); d.row.classList.add('td-drag'); }
+  e.preventDefault();
+  d.row.style.transform = `translateY(${dy}px)`;
+  const y = d.mids[d.from] + dy;
+  let to = 0;
+  d.mids.forEach((m, i) => { if (i !== d.from && y > m) to = i >= d.from ? i : i + 1; });
+  if (y > d.mids[d.from]) to = Math.max(to, d.from); else to = Math.min(to, d.from);
+  d.to = to;
+  d.rows.forEach((r, i) => {
+    if (i === d.from) return;
+    const shift = d.from < to && i > d.from && i <= to ? -d.h : to < d.from && i >= to && i < d.from ? d.h : 0;
+    r.style.transform = shift ? `translateY(${shift}px)` : '';
+  });
+  const body = el.todo.querySelector('.fr-body'), b = body && body.getBoundingClientRect();   // scroll at the edges
+  if (b && e.clientY < b.top + 24) body.scrollTop -= 8; else if (b && e.clientY > b.bottom - 24) body.scrollTop += 8;
+}, { passive: false });
+function endTodoDrag(e) {
+  const d = tdDrag;
+  if (!d || e.pointerId !== d.id) return;
+  tdDrag = null;
+  if (!d.on) return;
+  tdSuppressClick = true;
+  setTimeout(() => { tdSuppressClick = false; }, 0);
+  d.list.classList.remove('sorting');
+  d.rows.forEach(r => { r.style.transform = ''; r.classList.remove('td-drag'); });
+  if (e.type === 'pointerup') reorderTodo(d.key, d.to); else renderTodo(cur());
+}
+window.addEventListener('pointerup', endTodoDrag);
+window.addEventListener('pointercancel', endTodoDrag);
+el.todo.addEventListener('keydown', e => {   // the grip also reorders from the keyboard
+  const g = e.target.closest('[data-tdgrip]');
+  if (!g || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+  e.preventDefault();
+  const key = g.dataset.tdgrip, i = todoItems(cur()).findIndex(it => it.key === key);
+  reorderTodo(key, i + (e.key === 'ArrowUp' ? -1 : 1));
+  const again = el.todo.querySelector(`[data-tdgrip="${CSS.escape(key)}"]`);
+  if (again) again.focus();
+});
 function setPriority(id, v) {
   const p = cur();
   if (!p || !p.nodes[id] || state.readOnly || p.nodes[id].priority === v) return;
-  mutate(p => { p.nodes[id].priority = v; p.nodes[id].updated = nowISO(); }, { insp: true });
+  mutate(p => { p.nodes[id].priority = v; p.nodes[id].prank = null; p.nodes[id].updated = nowISO(); }, { insp: true });
 }
 function setSubPriority(techId, sid, v) {
   const p = cur(), x = p && p.nodes[techId] && findSub(p.nodes[techId], sid);
   if (!x || state.readOnly || x.priority === v) return;
-  mutate(p => { findSub(p.nodes[techId], sid).priority = v; p.nodes[techId].updated = nowISO(); }, { insp: true });
+  mutate(p => { const x = findSub(p.nodes[techId], sid); x.priority = v; x.prank = null; p.nodes[techId].updated = nowISO(); }, { insp: true });
 }
 const prioControl = (v, ro, attr) => `<div class="field"><span class="lbl">Priority</span><div class="mini-seg prio-seg" role="group" aria-label="Priority">`
   + [null, 1, 2, 3, 4, 5].map(k => `<button ${attr}="${k || ''}" class="${(v || null) === k ? 'on' : ''}" aria-pressed="${(v || null) === k}"${ro}${k ? ` title="Priority ${k}${k === 1 ? ', most urgent' : ''} (key ${k})"` : ' title="No priority (key 0)"'}>${k ? 'P' + k : '–'}</button>`).join('')
@@ -2411,6 +2499,7 @@ el.inodes.addEventListener('click', e => {   // keyboard activation of a card's 
 });
 el.crumbBack.addEventListener('click', () => closeInner());
 el.todo.addEventListener('click', e => {
+  if (tdSuppressClick || e.target.closest('[data-tdgrip]')) return;
   if (e.target.closest('#tdToggle')) { prefs.todoOpen = !todoOpen(); savePrefs(); renderTodo(cur()); return; }
   const tick = e.target.closest('[data-tdtick]');
   if (tick) { todoTick(tick.dataset.tdtick); return; }
