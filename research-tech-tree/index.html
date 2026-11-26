@@ -914,11 +914,15 @@ function settleUp(n, pid) {
     const kids = kidsOf(n, at).filter(x => x.status !== 'dropped');
     const all = kids.length > 0 && kids.every(x => x.status === 'done');
     const started = kids.some(x => x.status === 'done' || x.status === 'active');
+    const working = kids.some(x => x.status === 'active');
     const auto = at !== null || !isRoute(n);
+    // Work in progress underneath means the task above is not done, however it was marked done.
+    // An adopted route is the exception: reopening it would bring back the alternatives it settled.
+    const forced = working && auto;
     if (all && auto && holder.status !== 'done' && holder.status !== 'dropped') {
       holder.status = 'done'; holder.autoDone = true;
       if (at === null) res.tech = 'completed'; else res.completed.push(at);
-    } else if (!all && holder.status === 'done' && holder.autoDone) {
+    } else if (!all && holder.status === 'done' && (holder.autoDone || forced)) {
       holder.status = 'active'; holder.autoDone = false;
       if (at === null) res.tech = 'reopened'; else res.reopened.push(at);
     } else if (started && holder.status === 'todo') holder.status = 'active';   // work inside has begun
@@ -1209,7 +1213,7 @@ function subEdit(techId, fn, { ticked = null } = {}) {
   if (res.completed.length) play('complete'); else if (ticked) play('tick');
   const msg = [];
   if (res.completed.length) msg.push(`Completed ${names(res.completed)}: all ${res.completed.length > 1 ? 'their' : 'its'} subtasks are done.`);
-  if (res.reopened.length) msg.push(`Reopened ${names(res.reopened)}, since a subtask is open again.`);
+  if (res.reopened.length) msg.push(`Reopened ${names(res.reopened)}, since work under ${res.reopened.length > 1 ? 'them' : 'it'} is open again.`);
   const top = subProgress(t, null);
   if (ticked && isRoute(t) && t.status === 'active' && top.total && top.done === top.total) {
     msg.push(`Every task inside “${trunc(t.title, 30)}” is done.`);
