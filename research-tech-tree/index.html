@@ -349,6 +349,7 @@ kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border: 1px solid v
 .field textarea {
   width: 100%; resize: vertical; padding: 8px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); line-height: 1.45;
 }
+.inspector .field textarea { resize: none; overflow: hidden; min-height: 4.6em; }
 .field textarea:focus, .field select:focus, .field input:focus, .inp:focus, .addsel:focus { border-color: var(--active); outline: none; }
 .field input[type="range"] { width: 100%; accent-color: var(--active); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -2620,6 +2621,11 @@ function innerInspClick(b) {
   }
 }
 el.insp.addEventListener('focusout', () => { lastCo = null; });
+// Note boxes grow with their text, so a note is always shown in full (the panel scrolls instead).
+function fitTextarea(t) { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; }
+new MutationObserver(() => el.insp.querySelectorAll('.field textarea').forEach(fitTextarea)).observe(el.insp, { childList: true });
+el.insp.addEventListener('input', e => { if (e.target.matches('.field textarea')) fitTextarea(e.target); });
+window.addEventListener('resize', () => el.insp.querySelectorAll('.field textarea').forEach(fitTextarea));
 
 el.projSel.addEventListener('change', () => openProject(el.projSel.value));
 el.addBtn.addEventListener('click', () => (state.inner ? iAdd(state.isel && state.isel !== '__root' ? state.isel : null) : addIdea(state.sel ? 'follow' : 'root')));
