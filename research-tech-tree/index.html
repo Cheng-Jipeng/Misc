@@ -173,6 +173,11 @@ button { cursor: pointer; }
 .port:hover { border-color: var(--active); background: var(--active-soft); }
 @media (hover: none) { .node:not(.sel) .port { display: none; } }
 .node.drop-ok, .inode.drop-ok { outline: 2px dashed var(--avail); outline-offset: 4px; }
+.node.drop-before::before, .inode.drop-before::before, .node.drop-after::after, .inode.drop-after::after {
+  content: ""; position: absolute; left: 6px; right: 6px; height: 4px; border-radius: 2px; background: var(--avail); pointer-events: none;
+}
+.node.drop-before::before, .inode.drop-before::before { top: -12px; }
+.node.drop-after::after, .inode.drop-after::after { bottom: -12px; }
 .inode.drop-bad { outline: 2px dashed var(--drop); outline-offset: 4px; }
 .node.drag-src, .inode.drag-src { opacity: .35; }
 .drag-ghost { pointer-events: none; z-index: 5; opacity: .92; box-shadow: 0 16px 40px var(--shadow) !important; transform: rotate(-1.5deg); }
@@ -1784,7 +1789,7 @@ function renderFrontier() {
     + `<h3 class="fr-h">Researching</h3>${act.length ? act.map(item).join('') : '<p class="fr-none">Nothing in progress. Start one of the available ideas.</p>'}`
     + `<h3 class="fr-h">Available</h3>${av.length ? av.map(item).join('') : '<p class="fr-none">Nothing is unlocked right now. Finish a task or explore a route to open what comes next.</p>'}`
     + `<div class="legend">${DS_ORDER.map(s => `<span><i class="dot s-${s}"></i>${LEGEND_LABEL[s] || DS_LABEL[s]}</span>`).join('')}<span><i class="dot shape"></i>Task</span><span><i class="dot shape route"></i>Route</span></div>`
-    + '<p class="keys edit-only"><kbd>N</kbd> task · <kbd>R</kbd> competing routes · double-click a card to open its task tree · drag a card onto another to move it under that one · <kbd>P</kbd> parallel · <kbd>F</kbd> fit · <kbd>Del</kbd> delete · <kbd>Ctrl Z</kbd> undo. Drag the dot on a card\'s right edge onto another card to link them.</p>'
+    + '<p class="keys edit-only"><kbd>N</kbd> task · <kbd>R</kbd> competing routes · double-click a card to open its task tree · drag a card onto another to move it under that one, or onto its top or bottom edge to place it before or after · <kbd>P</kbd> parallel · <kbd>F</kbd> fit · <kbd>Del</kbd> delete · <kbd>Ctrl Z</kbd> undo. Drag the dot on a card\'s right edge onto another card to link them.</p>'
     + '</div>';
   const nb = el.frontier.querySelector('.fr-body');
   if (nb) nb.scrollTop = scroll;
@@ -2248,20 +2253,28 @@ el.viewport.addEventListener('pointermove', e => {
 // ---------- dragging a card onto another to move it there
 // On the tech tree that replaces the card's parent line (other prerequisites stay); in a task tree it
 // moves the task, with its subtasks, under the target, or to the top level when dropped on the card.
-function dragTarget(id) {   // -> { ok, label } for dropping the dragged card on card `id`
+// Where a card lands depends on where it is dropped on the target: its top edge puts it just above
+// the target (as a sibling), its bottom edge just below, and its middle makes it the target's child.
+function dropZone(card, y) {
+  if (card.classList.contains('iroot')) return 'child';
+  const r = card.getBoundingClientRect(), f = (y - r.top) / r.height;
+  return f < 0.3 ? 'before' : f > 0.7 ? 'after' : 'child';
+}
+function dragTarget(id, zone) {   // -> { ok, mode, pid, same, why } for dropping the dragged card on card `id`
   const d = gesture.drag, p = cur();
   if (state.inner) {
     const n = innerTech(), x = n && findSub(n, d.id);
     if (!x || id === d.id) return { ok: false };
-    const pid = id === '__root' ? null : id;
-    if (x.parent === pid) return { ok: false, same: true };
+    const pid = zone === 'child' ? (id === '__root' ? null : id) : findSub(n, id).parent;
+    if (zone === 'child' && x.parent === pid) return { ok: false, same: true };
     if (pid && inSubtree(n, pid, d.id)) return { ok: false, why: 'A task cannot go under one of its own subtasks.' };
-    return { ok: true, pid };
+    return { ok: true, mode: zone, pid };
   }
   if (!p.nodes[id] || id === d.id) return { ok: false };
-  if (L.parent[d.id] === id) return { ok: false, same: true };
-  if (dependsOn(p, id, d.id)) return { ok: false, why: `That would make a loop: “${trunc(p.nodes[id].title, 30)}” already depends on it.` };
-  return { ok: true };
+  const pid = zone === 'child' ? id : L.parent[id] || null;
+  if (zone === 'child' && L.parent[d.id] === id) return { ok: false, same: true };
+  if (pid && dependsOn(p, pid, d.id)) return { ok: false, why: `That would make a loop: “${trunc(p.nodes[pid].title, 30)}” already depends on it.` };
+  return { ok: true, mode: zone, pid };
 }
 function startDrag(e) {
   const d = gesture.drag, layer = state.inner ? el.inodes : el.nodes;
@@ -2291,11 +2304,16 @@ function moveDrag(e) {
   const hit = document.elementFromPoint(e.clientX, e.clientY);
   const card = hit && hit.closest ? hit.closest(state.inner ? '.inode' : '#nodes .node') : null;
   const id = card && card !== d.ghost ? (state.inner ? card.dataset.iid : card.dataset.id) : null;
-  if (d.over && d.over !== card) d.over.classList.remove('drop-ok', 'drop-bad');
+  if (d.over) d.over.classList.remove('drop-ok', 'drop-bad', 'drop-before', 'drop-after');
   d.over = card && card !== d.ghost ? card : null;
-  d.verdict = id ? dragTarget(id) : null;
+  const zone = d.over ? dropZone(d.over, e.clientY) : null;
+  d.verdict = id ? dragTarget(id, zone) : null;
   d.overId = id;
-  if (d.over) { d.over.classList.toggle('drop-ok', d.verdict.ok); d.over.classList.toggle('drop-bad', !d.verdict.ok && !d.verdict.same); }
+  if (d.over) {
+    const v = d.verdict;
+    if (v.ok && v.mode !== 'child') d.over.classList.add(v.mode === 'before' ? 'drop-before' : 'drop-after');
+    else { d.over.classList.toggle('drop-ok', v.ok); d.over.classList.toggle('drop-bad', !v.ok && !v.same); }
+  }
 }
 function endDrag(e) {
   const d = gesture && gesture.drag;
@@ -2303,7 +2321,7 @@ function endDrag(e) {
   if (!d) return;
   if (d.ghost) d.ghost.remove();
   if (d.src) d.src.classList.remove('drag-src');
-  if (d.over) d.over.classList.remove('drop-ok', 'drop-bad');
+  if (d.over) d.over.classList.remove('drop-ok', 'drop-bad', 'drop-before', 'drop-after');
   gesture.drag = null;
   swallowClick(e ? e.clientX : -1e4, e ? e.clientY : -1e4);
   const v = d.verdict;
@@ -2311,11 +2329,52 @@ function endDrag(e) {
   if (!v.ok) { if (v.why) toast(v.why); return; }
   if (state.inner) {
     const n = innerTech(), x = findSub(n, d.id), to = v.pid ? findSub(n, v.pid) : null;
-    iReparent(d.id, v.pid);
+    if (v.mode === 'child') {
+      iReparent(d.id, v.pid);
+      toast(`Moved “${trunc(x.text, 30)}” ${to ? `under “${trunc(to.text, 30)}”` : 'to the top level'}.`, { action: 'Undo', onAction: undo });
+    } else {
+      iPlace(d.id, d.overId, v.mode === 'after');
+      toast(`Moved “${trunc(x.text, 30)}” ${v.mode} “${trunc(findSub(n, d.overId).text, 30)}”.`, { action: 'Undo', onAction: undo });
+    }
     ifx[d.id] = 'fx-tick';
     renderInner();
-    toast(`Moved “${trunc(x.text, 30)}” ${to ? `under “${trunc(to.text, 30)}”` : 'to the top level'}.`, { action: 'Undo', onAction: undo });
-  } else moveUnder(d.id, d.overId);
+  } else if (v.mode === 'child') moveUnder(d.id, d.overId);
+  else placeBeside(d.id, d.overId, v.mode === 'after', v.pid);
+}
+// Put a task right before or after another, as its sibling (taking that task's parent).
+function iPlace(sid, targetId, after) {
+  const n = innerTech();
+  if (!n || state.readOnly || sid === targetId) return;
+  subEdit(n.id, t => {
+    const x = findSub(t, sid), tg = findSub(t, targetId), old = x.parent;
+    x.parent = tg.parent;
+    const sibs = kidsOf(t, tg.parent).filter(y => y.id !== sid);
+    sibs.splice(sibs.indexOf(tg) + (after ? 1 : 0), 0, x);
+    sibs.forEach((y, i) => { y.seq = i; });
+    if (old === x.parent) return { completed: [], reopened: [], tech: null, moved: true };
+    const a = settleUp(t, old), b = settleUp(t, x.parent);
+    return { completed: [...a.completed, ...b.completed], reopened: [...a.reopened, ...b.reopened], tech: b.tech || a.tech };
+  });
+}
+// The same on the tech tree: the card takes the target's parent line and sits just before or after it.
+function placeBeside(id, targetId, after, pid) {
+  const p = cur(), n = p.nodes[id], t = p.nodes[targetId], old = L.parent[id];
+  mutate(p => {
+    const tiersBefore = L ? L.maxDepth + 1 : 0;
+    const m = p.nodes[id];
+    if (old !== pid) {
+      m.prereqs = uniq([...m.prereqs.filter(q => q !== old), ...(pid ? [pid] : [])]);
+      if (pid && m.alts.includes(pid)) removeFromGroup(p, id);
+    }
+    const arr = sortedNodes(p).filter(x => x.id !== id);
+    arr.splice(arr.findIndex(x => x.id === targetId) + (after ? 1 : 0), 0, m);
+    arr.forEach((x, i) => { x.seq = i; });
+    m.updated = nowISO();
+    stampTier(p, id, tiersBefore);
+  }, { insp: !!state.sel });
+  fx[id] = 'fx-tick';
+  render();
+  toast(`Moved “${trunc(n.title, 30)}” ${after ? 'after' : 'before'} “${trunc(t.title, 30)}”.`, { action: 'Undo', onAction: undo });
 }
 function moveUnder(id, targetId) {
   const p = cur(), n = p.nodes[id], t = p.nodes[targetId], old = L.parent[id];
